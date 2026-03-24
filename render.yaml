@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: kush2713-swasthyaqueue-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npx next start --hostname 0.0.0.0 --port $PORT
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://kush2713-swasthyaqueue-backend.onrender.com
+
+  - type: web
+    name: kush2713-swasthyaqueue-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kush2713-swasthyaqueue-db
+          property: connectionString
+      - key: ML_SERVICE_URL
+        value: https://kush2713-swasthyaqueue-ml.onrender.com
+
+  - type: web
+    name: kush2713-swasthyaqueue-ml
+    runtime: python
+    plan: free
+    rootDir: ml-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+
+databases:
+  - name: kush2713-swasthyaqueue-db
+    plan: free
+    databaseName: swasthyaqueue
+    user: swasthyaqueue_user

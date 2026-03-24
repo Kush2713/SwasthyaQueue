@@ -368,6 +368,47 @@ You should also add:
 - health checks
 - backups for database
 
+## Short-Term Demo Hosting On Render
+
+For a short live demo, this repo now includes:
+
+- [render.yaml](D:/Study/Learning/Projects/SwasthyaQueue/render.yaml)
+
+That file defines:
+
+- frontend web service
+- backend web service
+- ML web service
+- PostgreSQL database
+
+### Recommended Render deployment flow
+
+1. Push the `development` branch to GitHub.
+2. In Render, create a new Blueprint instance from the repo.
+3. Let Render read `render.yaml`.
+4. Approve the services and database.
+5. Deploy.
+6. Run the SQL in [backend/schema.sql](D:/Study/Learning/Projects/SwasthyaQueue/backend/schema.sql) against the Render Postgres database after it is created.
+7. Open the frontend Render URL and test the full flow.
+
+### Important note for Render free tier
+
+Free services can spin down after inactivity.
+That means:
+
+- the first request after idle time can be slow
+- backend or ML may take a little time to wake up
+
+For a low-traffic short demo this is usually acceptable, but it is not ideal for a polished production launch.
+
+### Render-specific app changes already included
+
+- backend supports `DATABASE_URL`
+- backend supports env-based `ML_SERVICE_URL`
+- ML service binds to Render's `PORT`
+- ML service can run with `gunicorn`
+- frontend is ready to use a production `NEXT_PUBLIC_API_BASE_URL`
+
 ## Suggested Future Enhancements
 
 ### Patient side

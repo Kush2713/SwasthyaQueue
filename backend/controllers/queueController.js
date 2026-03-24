@@ -1,6 +1,8 @@
 const pool = require("../db");
 const axios = require("axios");
 
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:5001";
+
 
 // ✅ Add patient to queue with ML + fallback logic
 const addToQueue = async (req, res) => {
@@ -18,7 +20,7 @@ const addToQueue = async (req, res) => {
     // 🤖 STEP 1: CALL ML MODEL
     // ============================
     try {
-      const mlResponse = await axios.post("http://127.0.0.1:5001/predict", {
+      const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict`, {
         age: age || 30,
         pain_scale: pain_scale || 0,
         symptom_code: 2 // (static for now)

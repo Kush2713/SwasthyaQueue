@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import pickle
 import pandas as pd
+import os
 
 app = Flask(__name__)
 
@@ -47,4 +48,6 @@ def predict():
 # Run server
 # -----------------------------
 if __name__ == "__main__":
-    app.run(port=5001, debug=True)
+    port = int(os.getenv("PORT", "5001"))
+    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host="0.0.0.0", port=port, debug=debug)
