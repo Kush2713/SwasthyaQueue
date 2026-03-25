@@ -45,13 +45,18 @@ export default function PatientTokenPage({ tokenData, onBack, onProceed }) {
               <Info label="Registered At" value={tokenData.registeredAt} />
             </div>
 
+            {tokenData.preferredSlot ? (
+              <div style={{ border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#334155", borderRadius: 8, padding: "10px 12px", marginTop: 10, fontSize: 13 }}>
+                Preferred slot noted: {new Date(tokenData.preferredSlot).toLocaleString("en-IN")}
+              </div>
+            ) : null}
+
             <div style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: "10px 12px", marginTop: 10, fontSize: 13 }}>
               SMS alert will be sent to {formatIndianMobile(tokenData.mobile)} when your turn is near.
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-              <button type="button" onClick={onBack} style={btnGhost}>Back to Registration</button>
-              <button type="button" onClick={onProceed} style={btnPrimary}>Open Dashboard</button>
+              <button type="button" onClick={onProceed} style={btnPrimary}>Go to Dashboard</button>
             </div>
           </div>
         </section>

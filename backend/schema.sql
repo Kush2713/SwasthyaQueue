@@ -13,16 +13,76 @@ CREATE TABLE IF NOT EXISTS patients (
   name VARCHAR(120) NOT NULL,
   age INTEGER NOT NULL CHECK (age >= 0),
   gender VARCHAR(20),
-  phone VARCHAR(20)
+  phone VARCHAR(20),
+  email VARCHAR(160),
+  address TEXT,
+  emergency_contact VARCHAR(20),
+  blood_group VARCHAR(10),
+  allergies TEXT,
+  chronic_conditions TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS patient_accounts (
+  account_id SERIAL PRIMARY KEY,
+  patient_id INTEGER NOT NULL UNIQUE REFERENCES patients(patient_id) ON DELETE CASCADE,
+  email VARCHAR(160) UNIQUE,
+  mobile VARCHAR(20) UNIQUE,
+  account_source VARCHAR(20) NOT NULL DEFAULT 'self',
+  created_by_role VARCHAR(30),
+  created_by_name VARCHAR(120),
+  assisted_reference VARCHAR(40) UNIQUE,
+  otp_hash VARCHAR(128),
+  otp_expires_at TIMESTAMP,
+  otp_requested_at TIMESTAMP,
+  last_login_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS appointments (
+  appointment_id SERIAL PRIMARY KEY,
+  patient_id INTEGER NOT NULL REFERENCES patients(patient_id) ON DELETE CASCADE,
+  department_id INTEGER NOT NULL REFERENCES departments(department_id) ON DELETE CASCADE,
+  symptoms TEXT NOT NULL,
+  pain_scale INTEGER NOT NULL DEFAULT 0 CHECK (pain_scale BETWEEN 0 AND 10),
+  preferred_slot TIMESTAMP,
+  temperature_c NUMERIC(4,1),
+  blood_pressure VARCHAR(20),
+  pulse_rate INTEGER,
+  spo2 INTEGER,
+  weight_kg NUMERIC(5,1),
+  triage_notes TEXT,
+  assessed_by_name VARCHAR(120),
+  assessed_at TIMESTAMP,
+  diagnosis TEXT,
+  prescription TEXT,
+  doctor_notes TEXT,
+  consulted_by_name VARCHAR(120),
+  consulted_at TIMESTAMP,
+  status VARCHAR(20) NOT NULL DEFAULT 'booked',
+  queue_id INTEGER UNIQUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS queue (
   queue_id SERIAL PRIMARY KEY,
+  appointment_id INTEGER UNIQUE REFERENCES appointments(appointment_id) ON DELETE SET NULL,
   patient_id INTEGER NOT NULL REFERENCES patients(patient_id) ON DELETE CASCADE,
   department_id INTEGER NOT NULL REFERENCES departments(department_id) ON DELETE CASCADE,
   priority_level INTEGER NOT NULL CHECK (priority_level BETWEEN 1 AND 3),
   token_number INTEGER NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+  urgent_review_requested BOOLEAN NOT NULL DEFAULT FALSE,
+  urgent_review_reason TEXT,
+  urgent_review_requested_by_role VARCHAR(30),
+  urgent_review_requested_by_name VARCHAR(120),
+  urgent_review_requested_at TIMESTAMP,
+  escalated_at TIMESTAMP,
+  escalated_by_role VARCHAR(30),
+  escalated_by_name VARCHAR(120),
+  escalation_note TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -34,6 +94,13 @@ CREATE INDEX IF NOT EXISTS idx_queue_status
 
 CREATE INDEX IF NOT EXISTS idx_queue_priority_token
   ON queue (priority_level, token_number);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_patient_created
+  ON appointments (patient_id, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_active_per_patient
+  ON appointments (patient_id)
+  WHERE status IN ('booked', 'queued', 'ready-for-doctor', 'in-progress');
 
 INSERT INTO departments (name, avg_consult_time)
 VALUES

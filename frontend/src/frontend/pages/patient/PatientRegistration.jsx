@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COLORS = {
   navyDark: "#002060",
@@ -15,17 +15,17 @@ const COLORS = {
 const symptomDefs = [
   { key: "Chest Pain", score: 5, critical: true, department: "Cardiology" },
   { key: "Breathlessness", score: 6, critical: true, department: "General Medicine" },
-  { key: "Heavy Bleeding", score: 6, critical: true, department: "General Surgery" },
-  { key: "Unconsciousness", score: 7, critical: true, department: "General Medicine" },
-  { key: "Severe Injury", score: 5, critical: true, department: "Orthopaedics" },
-  { key: "Joint/Bone Pain", score: 3, critical: false, department: "Orthopaedics" },
-  { key: "Pregnancy Issue", score: 4, critical: false, department: "Gynecology & Obstetrics" },
-  { key: "Ear/Nose/Throat", score: 2, critical: false, department: "ENT" },
+  { key: "Heavy Bleeding", score: 6, critical: true, department: "Emergency" },
+  { key: "Unconsciousness", score: 7, critical: true, department: "Emergency" },
+  { key: "Severe Injury", score: 5, critical: true, department: "Orthopedics" },
+  { key: "Joint/Bone Pain", score: 3, critical: false, department: "Orthopedics" },
+  { key: "Child Fever", score: 3, critical: false, department: "Pediatrics" },
+  { key: "Ear/Nose/Throat", score: 2, critical: false, department: "General Medicine" },
   { key: "Fever", score: 1, critical: false, department: "General Medicine" },
   { key: "Mild Cough", score: 1, critical: false, department: "General Medicine" },
   { key: "Headache", score: 2, critical: false, department: "General Medicine" },
   { key: "Skin Rash", score: 1, critical: false, department: "General Medicine" },
-  { key: "Abdominal Pain", score: 2, critical: false, department: "General Surgery" },
+  { key: "Abdominal Pain", score: 2, critical: false, department: "General Medicine" },
   { key: "Eye Problem", score: 1, critical: false, department: "General Medicine" },
   { key: "Diabetes Check", score: 2, critical: false, department: "General Medicine" },
   { key: "Blood Pressure", score: 2, critical: false, department: "General Medicine" },
@@ -33,13 +33,13 @@ const symptomDefs = [
 ];
 
 const symptomMap = Object.fromEntries(symptomDefs.map((item) => [item.key, item]));
-const departments = [
-  "General Medicine",
-  "Orthopaedics",
-  "Gynecology & Obstetrics",
-  "General Surgery",
-  "Cardiology",
-  "ENT",
+const fallbackDepartments = ["General Medicine", "Cardiology", "Orthopedics", "Pediatrics", "Emergency"];
+const slotTimeOptions = [
+  "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00",
+  "14:30", "15:00", "15:30", "16:00", "16:30",
+  "17:00", "17:30", "18:00", "18:30", "19:00",
+  "19:30", "20:00", "20:30", "21:00", "21:30",
 ];
 
 const labelStyle = { fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6, display: "block" };
@@ -70,22 +70,68 @@ function formatIndianMobile(value = "") {
   return `+91 ${normalized.slice(0, 5)} ${normalized.slice(5)}`;
 }
 
+function formatSlotTime(timeValue = "") {
+  if (!timeValue) return "-";
+  const [hourText, minuteText] = timeValue.split(":");
+  const hours = Number(hourText);
+  const minutes = Number(minuteText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return timeValue;
+  const suffix = hours >= 12 ? "PM" : "AM";
+  const twelveHour = hours % 12 || 12;
+  return `${twelveHour}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+function formatPreferredSlot(value) {
+  if (!value) return "No preference";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function buildPreferredSlot(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return null;
+  return new Date(`${dateValue}T${timeValue}:00`).toISOString();
+}
+
+function getTodayDateValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function PatientRegistration({ onBack, user, onRegistered }) {
+  const initialForm = {
+    name: user?.name || "",
+    mobile: user?.mobile || "",
+    age: user?.age ? String(user.age) : "",
+    gender: user?.gender || "",
+    address: user?.address || "",
+    emergencyContact: user?.emergencyContact || "",
+    bloodGroup: user?.bloodGroup || "",
+    allergies: user?.allergies || "",
+    chronicConditions: user?.chronicConditions || "",
+    symptoms: [],
+    otherSymptoms: "",
+    painScale: 0,
+    preferredDate: "",
+    preferredTime: "",
+    department: "Auto-detect from symptoms",
+  };
+
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
-  const [form, setForm] = useState({
-    name: user?.name || "",
-    mobile: "",
-    age: "",
-    gender: "",
-    address: "",
-    symptoms: [],
-    otherSymptoms: "",
-    painScale: 0,
-    department: "Auto-detect from symptoms",
-  });
+  const [form, setForm] = useState(initialForm);
+  const [availableDepartments, setAvailableDepartments] = useState([]);
+  const [departmentLoadError, setDepartmentLoadError] = useState("");
 
   const risk = useMemo(
     () => computeRisk(form.symptoms, form.age, form.gender, Number(form.painScale)),
@@ -102,7 +148,36 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
           ? "Child support will be arranged automatically if needed."
           : "";
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDepartments() {
+      try {
+        const { getDepartments } = await import("../../lib/api");
+        const response = await getDepartments();
+        if (cancelled) return;
+
+        const names = Array.isArray(response)
+          ? response.map((department) => department?.name).filter(Boolean)
+          : [];
+
+        setAvailableDepartments(names.length ? names : fallbackDepartments);
+        setDepartmentLoadError("");
+      } catch (err) {
+        if (cancelled) return;
+        setAvailableDepartments(fallbackDepartments);
+        setDepartmentLoadError(err.message || "Unable to load live departments. Fallback choices are being shown.");
+      }
+    }
+
+    loadDepartments();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
   const toggleSymptom = (key) =>
     setForm((prev) => ({
       ...prev,
@@ -113,16 +188,23 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     }));
 
   const checkStep1 = () => {
-    if (!form.name.trim()) return "Full name is required.";
-    if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 120) return "Please enter a valid age (0-120).";
-    if (!form.gender) return "Please select gender.";
-    if (!isValidIndianMobile(form.mobile)) return "Enter the correct mobile number.";
+    if (!user?.patientId) return "Please sign in again before booking a visit.";
+    if (!form.name.trim()) return "Patient profile is incomplete. Please update your profile.";
+    if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 120) return "Patient profile age is missing or invalid.";
+    if (!form.gender) return "Patient profile gender is missing.";
+    if (!isValidIndianMobile(form.mobile)) return "Patient mobile number is missing or invalid.";
+    if (!isValidIndianMobile(form.emergencyContact)) return "Emergency contact is required in the saved profile.";
     return "";
   };
 
   const checkStep2 = () => {
-    if (form.symptoms.length || form.otherSymptoms.trim()) return "";
-    return "Please select at least 1 symptom or enter a short note.";
+    if (!form.symptoms.length && !form.otherSymptoms.trim()) {
+      return "Please select at least 1 symptom or enter a short note.";
+    }
+    if ((form.preferredDate && !form.preferredTime) || (!form.preferredDate && form.preferredTime)) {
+      return "Select both preferred date and preferred time, or leave both empty.";
+    }
+    return "";
   };
 
   const next = () => {
@@ -139,55 +221,65 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     setLoading(true);
     setError("");
     try {
-      const { addToQueue, getDepartmentIdByName, getQueueByDepartment, getQueuePosition, registerPatient } = await import("../../lib/api");
-      const department = form.department === "Auto-detect from symptoms" ? risk.suggestedDepartment : form.department;
+      const {
+        createAppointment,
+        getDepartmentIdByName,
+        updateMyPatientProfile,
+      } = await import("../../lib/api");
+
+      const autoDepartment = availableDepartments.includes(risk.suggestedDepartment)
+        ? risk.suggestedDepartment
+        : "General Medicine";
+      const department = form.department === "Auto-detect from symptoms" ? autoDepartment : form.department;
       const departmentId = getDepartmentIdByName(department);
       const selectedSymptoms = form.symptoms.filter((item) => item !== "Other");
       const finalSymptoms = form.otherSymptoms.trim()
         ? [...selectedSymptoms, `Other: ${form.otherSymptoms.trim()}`]
         : selectedSymptoms;
       const symptomsText = finalSymptoms.join(", ") || "General checkup";
+      const preferredSlot = buildPreferredSlot(form.preferredDate, form.preferredTime);
 
-      const patientResponse = await registerPatient({
-        name: form.name.trim(),
-        age: Number(form.age),
-        gender: form.gender,
-        phone: normalizeIndianMobile(form.mobile),
-      });
+      if (user?.patientId) {
+        await updateMyPatientProfile({
+          name: form.name.trim(),
+          age: Number(form.age),
+          gender: form.gender,
+          mobile: normalizeIndianMobile(form.mobile),
+          email: user?.email || null,
+          address: form.address?.trim() || null,
+          emergencyContact: form.emergencyContact?.trim() || null,
+          bloodGroup: form.bloodGroup?.trim() || null,
+          allergies: form.allergies?.trim() || null,
+          chronicConditions: form.chronicConditions?.trim() || null,
+        });
+      }
 
-      const patientId = patientResponse?.patient?.patient_id;
-      const queueResponse = await addToQueue({
-        patient_id: patientId,
+      const appointmentResponse = await createAppointment({
         department_id: departmentId,
         symptoms: symptomsText,
         pain_scale: Number(form.painScale),
-        age: Number(form.age),
+        preferred_slot: preferredSlot,
       });
 
-      const [positionResponse, departmentQueue] = await Promise.all([
-        getQueuePosition(patientId, departmentId),
-        getQueueByDepartment(departmentId),
-      ]);
-
-      const queueItem = queueResponse?.queue;
-      const currentPosition = positionResponse?.position || 1;
-      const currentQueueItem = departmentQueue.find((item) => item.queue_id === queueItem.queue_id) || {};
-      const registeredAt = queueItem?.created_at
-        ? new Date(queueItem.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })
-        : new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+      const appointment = appointmentResponse?.appointment;
+      const registeredAt = appointment?.createdAt
+        ? new Date(appointment.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+        : new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
       const payload = {
-        token: queueItem?.token_number,
-        queueId: queueItem?.queue_id,
-        patientId,
+        token: appointment?.token,
+        queueId: appointment?.queueId,
+        appointmentId: appointment?.appointmentId,
+        patientId: user?.patientId,
         departmentId,
-        estimatedWait: currentQueueItem?.estimated_wait_time ?? Math.max((currentPosition - 1) * 10, 0),
-        position: currentPosition,
+        estimatedWait: appointment?.estimatedWait ?? 0,
+        position: appointment?.position || 1,
         registeredAt,
+        preferredSlot: appointment?.preferredSlot,
         department,
         dept: department,
         priority: risk.priority,
-        priorityLevel: queueItem?.priority_level,
+        priorityLevel: appointment?.priorityLevel,
         riskScore: risk.score,
         patientName: form.name,
         symptoms: finalSymptoms,
@@ -214,22 +306,16 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     setError("");
     setLoading(false);
     setSuccess(null);
-    setForm({
-      name: user?.name || "",
-      mobile: "",
-      age: "",
-      gender: "",
-      address: "",
-      symptoms: [],
-      otherSymptoms: "",
-      painScale: 0,
-      department: "Auto-detect from symptoms",
-    });
+    setForm(initialForm);
   };
 
   const selectedSymptomsForReview = form.otherSymptoms.trim()
     ? [...form.symptoms.filter((item) => item !== "Other"), `Other: ${form.otherSymptoms.trim()}`]
     : form.symptoms.filter((item) => item !== "Other");
+
+  const reviewDepartment = form.department === "Auto-detect from symptoms"
+    ? `Auto (${availableDepartments.includes(risk.suggestedDepartment) ? risk.suggestedDepartment : "General Medicine"})`
+    : form.department;
 
   return (
     <div style={{ minHeight: "100vh", background: COLORS.pageBg }}>
@@ -239,29 +325,34 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
         {!success ? (
           <>
             <StepBar step={step} />
-            <FormCard title={`Step ${step} | ${step === 1 ? "Personal Details" : step === 2 ? "Symptoms" : "Review and Confirm"}`} subtitle="SwasthyaQueue Registration">
+            <FormCard title={`Step ${step} | ${step === 1 ? "Profile Summary" : step === 2 ? "Symptoms" : "Review and Confirm"}`} subtitle="Book New OPD Visit">
               {error ? <ErrorBanner message={error} /> : null}
 
               {step === 1 ? (
                 <>
                   {ageNote ? <NoticeBox message={ageNote} /> : null}
-                  <Row2Col>
-                    <Field label="Full Name *"><Input value={form.name} onChange={(value) => setField("name", value)} placeholder="Enter full name" /></Field>
-                    <Field label="Mobile Number *"><MobileInput value={form.mobile} onChange={(value) => setField("mobile", value)} /></Field>
-                  </Row2Col>
-                  <Row2Col>
-                    <Field label="Age *"><Input value={form.age} onChange={(value) => setField("age", value.replace(/\D/g, "").slice(0, 3))} placeholder="0 to 120" /></Field>
-                    <Field label="Gender *"><Select value={form.gender} onChange={(value) => setField("gender", value)} options={["", "Male", "Female", "Other"]} /></Field>
-                  </Row2Col>
-                  <Field label="Address / Village (optional)"><Input value={form.address} onChange={(value) => setField("address", value)} placeholder="Village / area / landmark" /></Field>
-                  <NavRow><GhostBtn onClick={onBack} disabled={!onBack}>Back</GhostBtn><PrimaryBtn onClick={next}>Continue</PrimaryBtn></NavRow>
+                  <div style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#F8FAFC", marginBottom: 12 }}>
+                    <SummaryRow label="Full Name" value={form.name} />
+                    <SummaryRow label="Age / Gender" value={`${form.age} / ${form.gender}`} />
+                    <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
+                    <SummaryRow label="Emergency Contact" value={formatIndianMobile(form.emergencyContact)} />
+                    <SummaryRow label="Blood Group" value={form.bloodGroup || "-"} />
+                    <SummaryRow label="Address" value={form.address || "-"} />
+                    <SummaryRow label="Allergies" value={form.allergies || "-"} />
+                    <SummaryRow label="Conditions" value={form.chronicConditions || "-"} noBorder />
+                  </div>
+                  <div style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
+                    These details come from your registered patient account, so you do not need to fill them again for every visit.
+                  </div>
+                  <NavRow><GhostBtn onClick={onBack} disabled={!onBack}>Back to Dashboard</GhostBtn><PrimaryBtn onClick={next}>Continue to Symptoms</PrimaryBtn></NavRow>
                 </>
               ) : null}
 
               {step === 2 ? (
                 <>
+                  {departmentLoadError ? <NoticeBox message={departmentLoadError} /> : null}
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 12, marginBottom: 12, fontSize: 13 }}>
-                    Select the symptoms that best match the patient. Staff will review the details and guide the queue flow.
+                    Select the symptoms that best match the patient. Hospital appointment hours are 9:30 AM to 9:30 PM.
                   </div>
                   <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 14 }}>
                     {symptomDefs.map((item) => {
@@ -293,7 +384,23 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                   {form.symptoms.includes("Other") ? <Field label="Other Symptoms / Details"><Input value={form.otherSymptoms} onChange={(value) => setField("otherSymptoms", value)} placeholder="Enter a short note for staff" /></Field> : null}
                   <Field label={`Pain Level: ${form.painScale}/10`}><input type="range" min={0} max={10} step={1} value={form.painScale} onChange={(event) => setField("painScale", Number(event.target.value))} style={{ width: "100%" }} /></Field>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", fontSize: 12, marginBottom: 12 }}><span style={{ color: "#64748B" }}>No pain (0)</span><span style={{ fontWeight: 700, color: form.painScale >= 7 ? "#DC2626" : form.painScale >= 5 ? "#D97706" : COLORS.navy }}>{risk.painSeverity}</span><span style={{ color: "#64748B", textAlign: "right" }}>Severe (10)</span></div>
-                  <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...departments]} /></Field>
+                  <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...availableDepartments]} /></Field>
+                  <Row2Col>
+                    <Field label="Preferred Date (optional)">
+                      <input type="date" min={getTodayDateValue()} value={form.preferredDate} onChange={(event) => setField("preferredDate", event.target.value)} style={inputStyle} />
+                    </Field>
+                    <Field label="Preferred Time (optional)">
+                      <select value={form.preferredTime} onChange={(event) => setField("preferredTime", event.target.value)} style={inputStyle}>
+                        <option value="">Select time</option>
+                        {slotTimeOptions.map((timeValue) => (
+                          <option key={timeValue} value={timeValue}>{formatSlotTime(timeValue)}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </Row2Col>
+                  <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
+                    OPD appointment hours are 9:30 AM to 9:30 PM. Please choose a slot within hospital hours.
+                  </div>
                   <NavRow><GhostBtn onClick={() => setStep(1)}>Back</GhostBtn><PrimaryBtn onClick={next}>Review</PrimaryBtn></NavRow>
                 </>
               ) : null}
@@ -304,8 +411,9 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                     <SummaryRow label="Full Name" value={form.name} />
                     <SummaryRow label="Age / Gender" value={`${form.age} / ${form.gender}`} />
                     <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
-                    <SummaryRow label="Department" value={form.department === "Auto-detect from symptoms" ? `Auto (${risk.suggestedDepartment})` : form.department} />
+                    <SummaryRow label="Department" value={reviewDepartment} />
                     <SummaryRow label="Symptoms" value={selectedSymptomsForReview.join(", ") || "Not specified"} />
+                    <SummaryRow label="Preferred Slot" value={form.preferredDate && form.preferredTime ? `${form.preferredDate} | ${formatSlotTime(form.preferredTime)}` : "No preference"} />
                     <SummaryRow label="Pain Level" value={`${form.painScale}/10`} noBorder />
                   </div>
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 10, marginBottom: 10 }}>Your details will be reviewed by staff and the correct queue will be assigned.</div>
@@ -330,6 +438,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                     <InfoCell label="Department" value={success.department} />
                     <InfoCell label="Registered At" value={success.registeredAt} />
                   </div>
+                  {success.preferredSlot ? <div style={{ border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#334155", borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10 }}>Preferred slot noted: {formatPreferredSlot(success.preferredSlot)}</div> : null}
                   <div style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10 }}>SMS alert will be sent to {formatIndianMobile(form.mobile)} when 3 patients are ahead.</div>
                   <NavRow><GhostBtn onClick={reset}>Register Another Patient</GhostBtn><PrimaryBtn onClick={() => window.print()}>Print Token</PrimaryBtn></NavRow>
                 </div>
@@ -353,7 +462,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
 }
 
 function StepBar({ step }) {
-  const labels = ["Personal Details", "Symptoms", "Review and Confirm"];
+  const labels = ["Profile Summary", "Symptoms", "Review and Confirm"];
   return <div style={{ display: "flex", marginBottom: 12 }}>{labels.map((label, index) => { const number = index + 1; const done = number < step; const active = number === step; return <div key={label} style={{ flex: 1, textAlign: "center", position: "relative" }}>{index ? <div style={{ position: "absolute", top: 14, left: "-50%", width: "100%", height: 2, background: number <= step ? COLORS.navy : "#CBD5E1" }} /> : null}<div style={{ width: 28, height: 28, borderRadius: "50%", margin: "0 auto", background: done ? COLORS.green : active ? COLORS.navy : "#94A3B8", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, position: "relative", zIndex: 1 }}>{done ? "OK" : number}</div><div style={{ fontSize: 12, marginTop: 6, color: "#334155", fontWeight: active ? 700 : 500 }}>{label}</div></div>; })}</div>;
 }
 
@@ -362,8 +471,7 @@ function ErrorBanner({ message }) { return <div style={{ border: "1px solid #FCA
 function NoticeBox({ message }) { return <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", borderRadius: 8, padding: 10, color: "#92400E", marginBottom: 12, fontSize: 13 }}>{message}</div>; }
 function Field({ label, children }) { return <label style={{ display: "block", marginBottom: 12 }}><span style={labelStyle}>{label}</span>{children}</label>; }
 function Input({ value, onChange, placeholder }) { return <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} style={inputStyle} />; }
-function MobileInput({ value, onChange }) { const normalized = normalizeIndianMobile(value); return <div style={{ display: "flex", alignItems: "stretch" }}><div style={{ border: `1px solid ${COLORS.inputBorder}`, borderRight: "none", borderRadius: "8px 0 0 8px", background: "#F8FAFC", color: "#334155", padding: "10px 12px", fontSize: 14, fontWeight: 700 }}>+91</div><input value={normalized} onChange={(event) => onChange(normalizeIndianMobile(event.target.value))} placeholder="98765 43210" style={{ ...inputStyle, borderRadius: "0 8px 8px 0" }} /></div>; }
-function Select({ value, onChange, options }) { return <select value={value} onChange={(event) => onChange(event.target.value)} style={inputStyle}>{options.map((option) => <option key={option} value={option}>{option || "Select gender"}</option>)}</select>; }
+function Select({ value, onChange, options }) { return <select value={value} onChange={(event) => onChange(event.target.value)} style={inputStyle}>{options.map((option) => <option key={option} value={option}>{option || "Select"}</option>)}</select>; }
 function Row2Col({ children }) { return <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))" }}>{children}</div>; }
 function NavRow({ children }) { return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>{children}</div>; }
 function PrimaryBtn({ children, onClick, disabled }) { return <button type="button" onClick={onClick} disabled={disabled} style={{ border: "none", borderRadius: 8, background: disabled ? "#94A3B8" : COLORS.navy, color: "#fff", padding: "10px 14px", fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer" }}>{children}</button>; }
