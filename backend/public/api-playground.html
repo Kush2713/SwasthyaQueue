@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwasthyaQueue API Playground</title>
+  <style>
+    :root {
+      --navy-dark: #002060;
+      --navy: #003580;
+      --page-bg: #eef2f7;
+      --card-bg: #ffffff;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #ff9933;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: var(--page-bg);
+      color: var(--text);
+    }
+    header {
+      background: var(--navy-dark);
+      color: #fff;
+      padding: 16px;
+    }
+    header h1 { margin: 0; font-size: 24px; }
+    header p { margin: 6px 0 0; color: #a8c8ff; }
+    main {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+    }
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .endpoint-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .endpoint-btn.active {
+      border-color: var(--navy);
+      background: #eff6ff;
+    }
+    .method {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      color: var(--navy);
+    }
+    label {
+      display: block;
+      margin-bottom: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      color: #334155;
+    }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 220px;
+      font-family: Consolas, monospace;
+      resize: vertical;
+    }
+    button.action {
+      border: none;
+      border-radius: 8px;
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    button.secondary {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    pre {
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      min-height: 240px;
+      padding: 14px;
+      overflow: auto;
+      font-size: 13px;
+    }
+    .topline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .badge {
+      background: #dbeafe;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .tip {
+      margin-top: 10px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SwasthyaQueue API Playground</h1>
+    <p>Backend-owned interactive testing console for auth, appointments, and queue APIs.</p>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2 style="margin-top:0">Endpoints</h2>
+      <div id="endpoint-list"></div>
+    </aside>
+
+    <section class="panel">
+      <div class="topline">
+        <span class="badge" id="method-label">POST</span>
+        <code id="path-label">/api/auth/patient/signup</code>
+      </div>
+      <p class="note" id="description-text"></p>
+
+      <label>
+        Bearer Token
+        <input id="token-input" placeholder="Paste auth token here for protected routes" />
+      </label>
+
+      <label>
+        Request JSON
+        <textarea id="request-body"></textarea>
+      </label>
+
+      <div style="margin-bottom: 12px;">
+        <button class="action" id="send-btn">Send Request</button>
+        <button class="secondary" id="reset-btn">Reset Sample</button>
+      </div>
+
+      <div class="status" id="status-line">No response yet</div>
+      <pre id="response-output">// Response output will appear here</pre>
+
+      <div class="tip">
+        Tip: after verifying OTP, copy the returned <code>authToken</code> into the Bearer Token field to test protected endpoints like <code>/api/auth/me</code> and <code>/api/appointments</code>.
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const endpoints = [
+      {
+        key: "signup",
+        label: "Patient Signup",
+        method: "POST",
+        path: "/api/auth/patient/signup",
+        description: "Create a patient account with saved medical profile details.",
+        sampleBody: {
+          name: "Test Patient",
+          age: 28,
+          gender: "Female",
+          mobile: "9876543210",
+          email: "testpatient@example.com",
+          address: "Demo Street",
+          emergencyContact: "9123456789",
+          bloodGroup: "O+",
+          allergies: "Peanuts",
+          chronicConditions: "Asthma"
+        }
+      },
+      {
+        key: "requestOtp",
+        label: "Request OTP",
+        method: "POST",
+        path: "/api/auth/patient/request-otp",
+        description: "Request an OTP using registered email or mobile.",
+        sampleBody: { identifier: "testpatient@example.com" }
+      },
+      {
+        key: "verifyOtp",
+        label: "Verify OTP",
+        method: "POST",
+        path: "/api/auth/patient/verify-otp",
+        description: "Verify the OTP and receive the patient auth token.",
+        sampleBody: { identifier: "testpatient@example.com", otp: "123456" }
+      },
+      {
+        key: "me",
+        label: "Current Patient",
+        method: "GET",
+        path: "/api/auth/me",
+        description: "Load the authenticated patient account using Bearer token.",
+        sampleBody: null
+      },
+      {
+        key: "activeAppointment",
+        label: "Active Appointment",
+        method: "GET",
+        path: "/api/appointments/me/active",
+        description: "See the patient's current active appointment and token.",
+        sampleBody: null
+      },
+      {
+        key: "history",
+        label: "Appointment History",
+        method: "GET",
+        path: "/api/appointments/me/history",
+        description: "List all appointments linked to the logged-in patient.",
+        sampleBody: null
+      },
+      {
+        key: "createAppointment",
+        label: "Book Appointment",
+        method: "POST",
+        path: "/api/appointments",
+        description: "Create a new OPD visit and queue entry for the logged-in patient.",
+        sampleBody: {
+          department_id: 1,
+          symptoms: "Fever and headache",
+          pain_scale: 4,
+          preferred_slot: "2026-03-26T10:30"
+        }
+      },
+      {
+        key: "cancelAppointment",
+        label: "Cancel Appointment",
+        method: "POST",
+        path: "/api/appointments/1/cancel",
+        description: "Cancel a booked or queued appointment for the logged-in patient.",
+        sampleBody: {}
+      },
+      {
+        key: "departments",
+        label: "Departments",
+        method: "GET",
+        path: "/test-db",
+        description: "Quick backend/DB department check.",
+        sampleBody: null
+      }
+    ];
+
+    const endpointList = document.getElementById("endpoint-list");
+    const methodLabel = document.getElementById("method-label");
+    const pathLabel = document.getElementById("path-label");
+    const descriptionText = document.getElementById("description-text");
+    const tokenInput = document.getElementById("token-input");
+    const requestBody = document.getElementById("request-body");
+    const statusLine = document.getElementById("status-line");
+    const responseOutput = document.getElementById("response-output");
+    const sendBtn = document.getElementById("send-btn");
+    const resetBtn = document.getElementById("reset-btn");
+
+    let selected = endpoints[0];
+
+    function renderEndpointList() {
+      endpointList.innerHTML = "";
+      endpoints.forEach((endpoint) => {
+        const button = document.createElement("button");
+        button.className = `endpoint-btn${endpoint.key === selected.key ? " active" : ""}`;
+        button.innerHTML = `
+          <div class="method">${endpoint.method}</div>
+          <div style="font-weight:700;margin-top:2px;">${endpoint.label}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px;">${endpoint.path}</div>
+        `;
+        button.onclick = () => {
+          selected = endpoint;
+          applySelectedEndpoint();
+        };
+        endpointList.appendChild(button);
+      });
+    }
+
+    function applySelectedEndpoint() {
+      methodLabel.textContent = selected.method;
+      pathLabel.textContent = selected.path;
+      descriptionText.textContent = selected.description;
+      requestBody.value = selected.sampleBody ? JSON.stringify(selected.sampleBody, null, 2) : "";
+      requestBody.disabled = selected.method === "GET";
+      statusLine.textContent = "No response yet";
+      responseOutput.textContent = "// Response output will appear here";
+      renderEndpointList();
+    }
+
+    async function runRequest() {
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Sending...";
+      statusLine.textContent = "Sending request...";
+      responseOutput.textContent = "";
+
+      try {
+        let body;
+        if (selected.method !== "GET" && requestBody.value.trim()) {
+          body = JSON.parse(requestBody.value);
+        }
+
+        const response = await fetch(selected.path, {
+          method: selected.method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(tokenInput.value.trim() ? { Authorization: `Bearer ${tokenInput.value.trim()}` } : {})
+          },
+          ...(selected.method !== "GET" ? { body: JSON.stringify(body || {}) } : {})
+        });
+
+        const text = await response.text();
+        statusLine.textContent = `${response.status} ${response.statusText}`;
+
+        try {
+          const data = text ? JSON.parse(text) : null;
+          responseOutput.textContent = JSON.stringify(data, null, 2);
+        } catch {
+          responseOutput.textContent = text || "(empty response)";
+        }
+      } catch (error) {
+        statusLine.textContent = "Request failed";
+        responseOutput.textContent = error.message || String(error);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send Request";
+      }
+    }
+
+    sendBtn.onclick = runRequest;
+    resetBtn.onclick = () => {
+      requestBody.value = selected.sampleBody ? JSON.stringify(selected.sampleBody, null, 2) : "";
+    };
+
+    applySelectedEndpoint();
+  </script>
+</body>
+</html>

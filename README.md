@@ -1,48 +1,128 @@
 # SwasthyaQueue
 
-SwasthyaQueue is a hospital queue management system with:
+SwasthyaQueue is a digital OPD queue and visit-management system designed for Indian hospitals and clinics. It combines:
+
+- patient self-service
+- front-desk assisted registration
+- nurse triage
+- doctor consultation workflow
+- live queue visibility
+
+The current repository includes:
 
 - a Next.js frontend
 - a Node.js + Express backend
-- a Python Flask ML service
+- a Python Flask ML service for triage support
 - a PostgreSQL database
+- Render deployment support
 
-The repository is now in a working local state.
-Frontend, backend, ML, and database all run together and the core queue flow is connected end to end.
+## Why This Project Exists
 
-## Current Working State
+Traditional OPD handling in many hospitals still depends on:
 
-### Working right now
+- paper slips
+- repeated manual form filling
+- unclear queue visibility
+- no structured nurse handoff
+- little or no patient-side visit tracking
 
-- patient registration flow
-- patient token generation
-- patient queue status view
-- staff dashboard queue view
-- staff call-next action
-- staff complete action
-- live queue display
-- backend to PostgreSQL connection
-- backend to ML service prediction call
+SwasthyaQueue aims to improve that by giving:
 
-### Still not fully implemented
+- patients a clear token and visit dashboard
+- reception a fast queue and lookup console
+- nurses a triage workspace
+- doctors a consultation workspace
+- hospital lobbies a live queue display
 
-- real authentication and authorization
-- real patient login or signup
-- doctor-specific workflow and notes
-- admin dashboard
-- manual priority override API
-- audit logs
-- production-grade validation and monitoring
+## Current Product State
 
-## Project Structure
+### Working now
 
-```text
-SwasthyaQueue/
-|-- frontend/      Next.js app
-|-- backend/       Express + PostgreSQL API
-|-- ml-service/    Flask ML service
-|-- README.md
-```
+- patient OTP signup/login
+- patient dashboard with active visit and history
+- patient booking flow with symptoms, review, and token generation
+- preferred date/time capture for booking
+- patient visit cancellation
+- receptionist dashboard
+- patient search by token, name, or mobile
+- receptionist queue calling
+- quick intake for rush cases
+- staff-assisted patient accounts for walk-ins / no-phone patients
+- nurse triage workspace
+- urgent review flagging by reception
+- nurse urgency override
+- nurse `Ready For Doctor` handoff
+- doctor consultation workspace
+- doctor diagnosis / prescription / notes / completion
+- shared patient case page
+- display screen / lobby queue board
+- backend + PostgreSQL integration
+- backend + ML integration
+- local development support
+- Render deployment support
+
+### Still not production-complete
+
+- strict backend authorization per role
+- real OTP delivery over SMS/email
+- audit trail for each operational change
+- doctor tests/orders workflow
+- revisit / follow-up scheduling workflow
+- absent / recall / transfer-department flow
+- admin reporting and analytics
+- production monitoring and hardening
+
+## User Roles
+
+### Patient
+
+Patient can:
+
+- create account
+- login with OTP
+- book a new visit
+- review and confirm symptoms
+- receive token
+- see active appointment
+- cancel active appointment
+- view past appointments
+
+### Receptionist
+
+Receptionist can:
+
+- search patient by token, name, or mobile
+- answer "how long will it take?" questions
+- call next patient
+- use quick intake for rush cases
+- create staff-assisted accounts
+- complete patient profile later
+- open patient case
+- flag urgent review for nurse
+
+### Nurse
+
+Nurse can:
+
+- review urgent flags
+- select one patient at a time for triage
+- record vitals
+- add triage notes
+- approve high / critical escalation
+- mark patient ready for doctor
+- open full case sheet
+
+### Doctor
+
+Doctor can:
+
+- open patients who are ready for consultation
+- review symptoms and triage context
+- add diagnosis
+- add prescription / advice
+- add doctor notes
+- complete visit
+- open full patient case
 
 ## Architecture
 
@@ -51,24 +131,45 @@ Frontend -> Backend -> PostgreSQL
 Frontend -> Backend -> ML Service
 ```
 
-Important:
+Rules:
 
-- the frontend should talk only to the backend
-- the backend owns queue logic and persistence
-- the ML service is only a helper for triage priority
-- PostgreSQL is the source of truth for patients, departments, and queue state
+- frontend talks only to backend
+- backend owns workflow rules and persistence
+- PostgreSQL is the source of truth
+- ML only assists with triage priority, not core storage
 
-## Local Run Commands
+## Repository Layout
+
+```text
+SwasthyaQueue/
+|-- frontend/
+|-- backend/
+|-- ml-service/
+|-- render.yaml
+|-- README.md
+|-- docs/
+```
+
+Useful docs added in this repo:
+
+- [backend/README.md](D:/Study/Learning/Projects/SwasthyaQueue/backend/README.md)
+- [frontend/README.md](D:/Study/Learning/Projects/SwasthyaQueue/frontend/README.md)
+- [ml-service/README.md](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/README.md)
+- [docs/README.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/README.md)
+- [docs/WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
+- [docs/DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
+
+## Local Setup
 
 Start each service in a separate terminal.
 
-### 1. PostgreSQL
+### PostgreSQL
 
 Make sure PostgreSQL is running locally on:
 
 - `localhost:5432`
 
-### 2. Backend
+### Backend
 
 From `backend/`:
 
@@ -85,8 +186,9 @@ Quick checks:
 
 - `http://localhost:5000/`
 - `http://localhost:5000/test-db`
+- `http://localhost:5000/playground`
 
-### 3. ML Service
+### ML Service
 
 From `ml-service/`:
 
@@ -99,14 +201,7 @@ Runs on:
 
 - `http://localhost:5001`
 
-Quick check:
-
-- `http://localhost:5001/`
-
-Note:
-If `python` is not available on PATH on your machine, use your local Python executable path instead.
-
-### 4. Frontend
+### Frontend
 
 From `frontend/`:
 
@@ -119,26 +214,18 @@ Default dev URL:
 
 - `http://localhost:3001`
 
-If you want `3000` instead:
+Optional:
 
 ```powershell
 $env:PORT='3000'
 npm.cmd run dev
 ```
 
-Why `3001` by default:
-
-- the standard `next dev` wrapper was hitting a Windows `spawn EPERM` issue
-- the repo now uses a direct dev launcher to avoid that
-- `3001` is safer when `3000` is already occupied
-
-## Environment Setup
+## Environment Variables
 
 ### Backend
 
-Create a `.env` in `backend/` using `backend/.env.example`.
-
-Expected values:
+Create `backend/.env` using `backend/.env.example`.
 
 ```env
 DB_USER=postgres
@@ -148,11 +235,12 @@ DB_PORT=5432
 DB_NAME=swasthyaqueue
 PORT=5000
 ML_SERVICE_URL=http://127.0.0.1:5001
+OTP_PREVIEW_ENABLED=true
 ```
 
 ### Frontend
 
-Create a `.env.local` in `frontend/` using `frontend/.env.example`.
+Create `frontend/.env.local` using `frontend/.env.example`.
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
@@ -160,48 +248,69 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
 
 ## Database
 
-The local schema file is:
+Main schema file:
 
 - `backend/schema.sql`
 
-It creates:
+Core tables:
 
-- database: `swasthyaqueue`
-- tables:
-  - `departments`
-  - `patients`
-  - `queue`
-
-It also seeds departments so the system can run immediately.
+- `departments`
+- `patients`
+- `patient_accounts`
+- `appointments`
+- `queue`
 
 To initialize locally:
 
 ```powershell
-psql -U postgres -d postgres -f backend/schema.sql
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d postgres -f backend/schema.sql
 ```
 
 ## Frontend Routes
 
-Main app routes:
+Main routes:
 
 - `/`
-- `/patient/register`
-- `/patient/token`
 - `/patient/dashboard`
+- `/patient/book`
+- `/patient/token`
+- `/reception/dashboard`
 - `/staff/dashboard`
+- `/case/queue/:queueId`
 - `/display`
 - `/tv`
 
-## Backend API
+## Backend APIs
 
 ### Utility
 
 - `GET /`
 - `GET /test-db`
+- `GET /playground`
+
+### Auth
+
+- `POST /api/auth/patient/signup`
+- `POST /api/auth/patient/request-otp`
+- `POST /api/auth/patient/verify-otp`
+- `GET /api/auth/me`
+- `POST /api/auth/staff/patient-account`
 
 ### Patients
 
 - `POST /api/patients/register`
+- `PUT /api/patients/me`
+- `PUT /api/patients/:id/profile`
+
+### Appointments
+
+- `POST /api/appointments`
+- `POST /api/appointments/quick-intake`
+- `GET /api/appointments/me/active`
+- `GET /api/appointments/me/history`
+- `GET /api/appointments/case/queue/:queue_id`
+- `POST /api/appointments/:id/cancel`
+- `POST /api/appointments/:id/doctor-update`
 
 ### Queue
 
@@ -209,258 +318,191 @@ Main app routes:
 - `POST /api/queue/check-turn`
 - `POST /api/queue/next`
 - `POST /api/queue/complete`
+- `POST /api/queue/:queue_id/urgent-review`
+- `POST /api/queue/:queue_id/override-priority`
+- `POST /api/queue/:queue_id/triage`
+- `POST /api/queue/:queue_id/ready-for-doctor`
 - `GET /api/queue/stats`
 - `GET /api/queue/:department_id`
 - `GET /api/queue/position/:patient_id/:department_id`
 
-## ML API
+## How Someone Can Use It
 
-The backend calls:
+### Self-service patient journey
 
-```text
-POST http://127.0.0.1:5001/predict
-```
+1. Patient creates account or logs in by OTP.
+2. Patient dashboard opens.
+3. Patient books visit and fills symptoms.
+4. Token is generated.
+5. Patient tracks active visit and history.
 
-Expected response:
+### Front-desk assisted journey
 
-```json
-{
-  "priority": 1
-}
-```
+1. Reception searches patient first.
+2. If patient exists, reception opens case or helps continue.
+3. If patient is new, reception can:
+   - create assisted account, or
+   - use quick intake for urgent queue entry
+4. Reception can call next and answer wait-time questions.
 
-## How To Test
+### Clinical journey
 
-### Basic health check
+1. Nurse opens triage workspace.
+2. Nurse records vitals and notes.
+3. Nurse escalates if needed.
+4. Nurse marks patient ready for doctor.
+5. Doctor opens consultation workspace.
+6. Doctor records diagnosis and advice.
+7. Doctor completes visit.
 
-Verify these first:
+## Workflow Summary
 
-- frontend loads
-- backend `/` works
-- backend `/test-db` returns department data
-- ML `/` returns `ML API Running...`
+See the full workflow breakdown here:
 
-### End-to-end queue test
+- [docs/WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
 
-1. Open frontend home page.
-2. Enter patient flow and register a patient.
-3. Confirm token page appears.
-4. Open patient dashboard and confirm live queue details load.
-5. Open staff dashboard in another tab.
-6. Open display page in another tab.
-7. In staff dashboard, click `Call Next`.
-8. Confirm display and patient status update.
-9. In staff dashboard, click `Complete`.
-10. Confirm queue advances correctly.
+## Demo Case Studies
 
-### Best realistic manual scenario
+Use these for presentation/demo storytelling:
 
-1. Register Patient A in a department.
-2. Register Patient B in the same department.
-3. Confirm both appear in the department queue.
-4. Call next from staff dashboard.
-5. Confirm Patient A becomes current.
-6. Complete Patient A.
-7. Confirm Patient B moves forward.
+- [docs/DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
 
-## What Is Real vs Mock
+They include:
 
-### Real today
+- one scenario per department
+- end-to-end demo flow
+- why digitization helps in that case
 
-- patient registration writes to backend
-- queue entry writes to database
-- backend asks ML service for priority
-- patient dashboard uses real queue data
-- staff dashboard uses real queue data
-- display page uses real queue data
+## Hosting
 
-### Mock or demo today
-
-- login page behavior
-- role authentication
-- override controls beyond basic queue actions
-- deeper doctor/admin workflows
-
-## Recommended Next Work
-
-This is the best next sequence if you want to make the project stronger quickly.
-
-### Priority 1: Make it safer and more production-ready
-
-- add request validation on backend routes
-- add proper error responses for bad input and service failures
-- add fallback logic when ML service is down
-- remove hardcoded backend password fallback in production usage
-- add consistent logging
-
-### Priority 2: Add real auth
-
-- patient signup/login
-- staff login
-- role-based access control
-- protected frontend routes
-
-### Priority 3: Improve real hospital workflow
-
-- manual priority override with reason
-- audit trail for call-next, complete, and overrides
-- department transfer
-- returning patient lookup by mobile number
-- patient history
-- family member / dependent registration
-
-### Priority 4: Improve ML realism
-
-- replace placeholder symptom coding with a real mapping flow
-- add confidence score
-- collect feedback on incorrect triage
-- version and retrain the model
-
-### Priority 5: Improve deployment readiness
-
-- use managed Postgres
-- add production env files and deployment configs
-- set CORS explicitly per environment
-- add health endpoints
-- add monitoring and uptime checks
-
-## Hosting Recommendation
-
-### Recommended simple deployment
-
-- Frontend: Vercel
-- Backend: Render or Railway
-- ML service: Render or Railway
-- Database: Neon, Supabase Postgres, Railway Postgres, or a managed PostgreSQL instance
-
-### Why this split works
-
-- frontend is static/app-host friendly
-- backend and ML service can scale independently
-- managed Postgres is easier than self-hosting
-
-### Simpler future architecture
-
-If you want easier deployment later, move the ML logic inside the backend and host:
-
-- one frontend
-- one backend
-- one database
-
-That reduces operational complexity a lot.
-
-## Production Hosting Notes
-
-Before deploying, make sure you set:
-
-- frontend API base URL
-- backend database credentials
-- backend ML service URL
-- backend CORS policy
-- production secrets only through environment variables
-
-You should also add:
-
-- HTTPS everywhere
-- rate limiting
-- request validation
-- structured logs
-- health checks
-- backups for database
-
-## Short-Term Demo Hosting On Render
-
-For a short live demo, this repo now includes:
+This repo includes:
 
 - `render.yaml`
 
-That file defines:
+Current short-term hosting path:
 
-- frontend web service
-- backend web service
-- ML web service
-- PostgreSQL database
+- frontend on Render
+- backend on Render
+- ML service on Render
+- PostgreSQL on Render
 
-### Recommended Render deployment flow
+### Render flow
 
-1. Push the `development` branch to GitHub.
-2. In Render, create a new Blueprint instance from the repo.
+1. Push branch to GitHub.
+2. Import repo as Render Blueprint.
 3. Let Render read `render.yaml`.
-4. Approve the services and database.
-5. Deploy.
-6. Run the SQL in `backend/schema.sql` against the Render Postgres database after it is created.
-7. Open the frontend Render URL and test the full flow.
+4. Deploy services.
+5. Run `backend/schema.sql` against the hosted database.
 
-### Important note for Render free tier
+## Future Development
 
-Free services can spin down after inactivity.
-That means:
+### ABHA / Digital Health Integration
 
-- the first request after idle time can be slow
-- backend or ML may take a little time to wake up
+Future real-life extension:
 
-For a low-traffic short demo this is usually acceptable, but it is not ideal for a polished production launch.
+- ABHA-based patient verification
+- fetch/link patient identity through verified health account flow
+- reduce repeated registration for returning patients
+- allow patient to view linked clinical history more safely
 
-### Render-specific app changes already included
+Suggested direction:
 
-- backend supports `DATABASE_URL`
-- backend supports env-based `ML_SERVICE_URL`
-- ML service binds to Render's `PORT`
-- ML service can run with `gunicorn`
-- frontend is ready to use a production `NEXT_PUBLIC_API_BASE_URL`
+- use ABHA only after patient verification/consent
+- keep hospital-local records separate until linked
+- allow fallback for patients without ABHA
 
-## Suggested Future Enhancements
+### Family Member Linking
 
-### Patient side
+Useful future feature:
 
-- signup/login
-- multilingual support
-- SMS / WhatsApp alerts
-- appointment reschedule/cancel
-- previous visit history
-- medical history summary
+- primary patient verifies identity
+- family member can be added after consent / OTP / ID verification
+- parent can manage child or dependent visits
+- caretaker can book or track visits for elder family members
 
-### Staff side
+### Patient Data Visibility
 
-- queue filters
-- priority override
-- printable slips
+Future patient-side improvements:
+
+- full consultation history
+- diagnosis history
+- prescriptions and advice
+- test orders and reports
+- revisit / follow-up reminders
+- family-linked records where authorized
+
+### Better Doctor Workflow
+
+Future doctor-side improvements:
+
+- test / lab order entry
+- medicines and dosage structure
+- follow-up date
+- referral to another department
+- printable or shareable consultation summary
+- past consultation comparison view
+
+### Better Nurse Workflow
+
+Future nurse-side improvements:
+
+- structured triage templates per department
+- red-flag prompts
+- emergency transfer action
+- absent / recall flow
+- post-consultation guidance checklist
+
+### Better Reception Workflow
+
+Future reception-side improvements:
+
 - transfer between departments
-- emergency fast-track tagging
-
-### Doctor side
-
-- consultation notes
-- prescription flow
-- follow-up scheduling
-- referral flow
-
-### Admin side
-
-- analytics dashboard
-- user management
-- doctor roster
-- department settings
+- revisit creation
+- family linking at desk
+- payment / registration counter integration
+- token reprint / SMS / WhatsApp share
 
 ## Important Files
 
-- `README.md`
 - `backend/server.js`
-- `backend/db.js`
 - `backend/schema.sql`
-- `frontend/package.json`
-- `frontend/postcss.config.mjs`
-- `frontend/next.config.ts`
-- `frontend/scripts/dev-direct.mjs`
+- `backend/bootstrap/ensureSchema.js`
+- `backend/controllers/authController.js`
+- `backend/controllers/patientController.js`
+- `backend/controllers/appointmentController.js`
+- `backend/controllers/queueController.js`
+- `backend/routes/authRoutes.js`
+- `backend/routes/patientRoutes.js`
+- `backend/routes/appointmentRoutes.js`
+- `backend/routes/queueRoutes.js`
 - `frontend/src/frontend/AppRouter.jsx`
+- `frontend/src/frontend/pages/LoginPage.jsx`
+- `frontend/src/frontend/pages/reception/ReceptionDashboard.jsx`
+- `frontend/src/frontend/pages/staff/StaffDashboard.jsx`
+- `frontend/src/frontend/pages/case/PatientCasePage.jsx`
+- `frontend/src/frontend/pages/patient/PatientDashboard.jsx`
+- `frontend/src/frontend/pages/patient/PatientRegistration.jsx`
+- `frontend/src/frontend/pages/patient/PatientTokenPage.jsx`
+- `frontend/src/frontend/pages/display/LiveQueueDisplay.jsx`
+- `frontend/src/frontend/lib/api.js`
 - `ml-service/app.py`
-- `ml-service/requirements.txt`
+- `render.yaml`
 
 ## Final Note
 
-This README now reflects the actual working state of the repository:
+This project has moved beyond a simple queue demo.
 
-- all major local services run
-- the core queue flow works
-- the current limitations are documented honestly
-- the most practical next steps and hosting direction are listed clearly
+It now models:
+
+- patient account + visit lifecycle
+- reception operations
+- nurse triage
+- doctor consultation
+- shared patient case visibility
+
+The next improvements should focus on:
+
+- real security and permissions
+- auditability
+- stronger medical workflows
+- patient history usefulness in real-life care
