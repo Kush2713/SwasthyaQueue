@@ -66,35 +66,35 @@ Frontend should not directly manage queue logic. The backend is the source of wo
 
 ## Important Files
 
-- [server.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/server.js)
+- [server.js](server.js)
   Express entry point and route mounting
-- [db.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/db.js)
+- [db.js](db.js)
   PostgreSQL connection config
-- [schema.sql](D:/Study/Learning/Projects/SwasthyaQueue/backend/schema.sql)
+- [schema.sql](schema.sql)
   main schema and seed setup
-- [bootstrap/ensureSchema.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/bootstrap/ensureSchema.js)
+- [bootstrap/ensureSchema.js](bootstrap/ensureSchema.js)
   schema bootstrap for local and hosted runs
 
 Controllers:
 
-- [controllers/authController.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/controllers/authController.js)
-- [controllers/patientController.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/controllers/patientController.js)
-- [controllers/appointmentController.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/controllers/appointmentController.js)
-- [controllers/queueController.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/controllers/queueController.js)
+- [controllers/authController.js](controllers/authController.js)
+- [controllers/patientController.js](controllers/patientController.js)
+- [controllers/appointmentController.js](controllers/appointmentController.js)
+- [controllers/queueController.js](controllers/queueController.js)
 
 Routes:
 
-- [routes/authRoutes.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/routes/authRoutes.js)
-- [routes/patientRoutes.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/routes/patientRoutes.js)
-- [routes/appointmentRoutes.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/routes/appointmentRoutes.js)
-- [routes/queueRoutes.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/routes/queueRoutes.js)
+- [routes/authRoutes.js](routes/authRoutes.js)
+- [routes/patientRoutes.js](routes/patientRoutes.js)
+- [routes/appointmentRoutes.js](routes/appointmentRoutes.js)
+- [routes/queueRoutes.js](routes/queueRoutes.js)
 
 Supporting logic:
 
-- [services/queueService.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/services/queueService.js)
-- [middleware/authMiddleware.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/middleware/authMiddleware.js)
-- [utils/auth.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/utils/auth.js)
-- [public/api-playground.html](D:/Study/Learning/Projects/SwasthyaQueue/backend/public/api-playground.html)
+- [services/queueService.js](services/queueService.js)
+- [middleware/authMiddleware.js](middleware/authMiddleware.js)
+- [utils/auth.js](utils/auth.js)
+- [public/api-playground.html](public/api-playground.html)
 
 ## Database Model
 
@@ -140,7 +140,7 @@ Useful checks:
 
 ## Environment Variables
 
-Create [`.env`](D:/Study/Learning/Projects/SwasthyaQueue/backend/.env) using [.env.example](D:/Study/Learning/Projects/SwasthyaQueue/backend/.env.example).
+Create [`.env`](.env) using [.env.example](.env.example).
 
 Typical local setup:
 
@@ -261,6 +261,6 @@ Hosted setups can use:
 
 ## Related Docs
 
-- [Root README](D:/Study/Learning/Projects/SwasthyaQueue/README.md)
-- [Workflows](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
-- [Demo Case Studies](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
+- [Root README](../README.md)
+- [Workflows](../docs/WORKFLOWS.md)
+- [Demo Case Studies](../docs/DEMO_CASE_STUDIES.md)

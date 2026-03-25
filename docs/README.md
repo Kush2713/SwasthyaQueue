@@ -11,7 +11,7 @@ Use these documents when you want to understand:
 
 ## Files In This Folder
 
-### [WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
+### [WORKFLOWS.md](WORKFLOWS.md)
 
 Use this when you want the operational flow.
 
@@ -24,7 +24,7 @@ It covers:
 - doctor consultation flow
 - display/lobby flow
 
-### [DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
+### [DEMO_CASE_STUDIES.md](DEMO_CASE_STUDIES.md)
 
 Use this when you want demo storytelling.
 
@@ -35,16 +35,31 @@ It includes:
 - why queue visibility and digitization matter in each case
 - intent and impact for live demo explanation
 
+### [FLOW_DIAGRAMS.md](FLOW_DIAGRAMS.md)
+
+Use this when you want quick visual explanation.
+
+It includes:
+
+- system architecture flow
+- patient flow
+- receptionist flow
+- nurse flow
+- doctor flow
+- rush-case flow
+- queue/display flow
+
 ## Suggested Reading Order
 
 If you are new to the project:
 
-1. [Root README](D:/Study/Learning/Projects/SwasthyaQueue/README.md)
-2. [WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
-3. [DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
-4. [Backend README](D:/Study/Learning/Projects/SwasthyaQueue/backend/README.md)
-5. [Frontend README](D:/Study/Learning/Projects/SwasthyaQueue/frontend/README.md)
-6. [ML Service README](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/README.md)
+1. [Root README](../README.md)
+2. [FLOW_DIAGRAMS.md](FLOW_DIAGRAMS.md)
+3. [WORKFLOWS.md](WORKFLOWS.md)
+4. [DEMO_CASE_STUDIES.md](DEMO_CASE_STUDIES.md)
+5. [Backend README](../backend/README.md)
+6. [Frontend README](../frontend/README.md)
+7. [ML Service README](../ml-service/README.md)
 
 ## Documentation Purpose
 

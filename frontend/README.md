@@ -183,8 +183,8 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
 - the app is role-driven, but backend authorization is still not fully production-hardened
 - dashboards and case page depend on the backend APIs being available
 - for full workflows, demo cases, and future roadmap, see:
-  - [Root README](D:/Study/Learning/Projects/SwasthyaQueue/README.md)
-  - [Docs README](D:/Study/Learning/Projects/SwasthyaQueue/docs/README.md)
+  - [Root README](../README.md)
+  - [Docs README](../docs/README.md)
 
 ## Suggested Future Frontend Improvements
 

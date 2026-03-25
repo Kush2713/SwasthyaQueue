@@ -152,12 +152,13 @@ SwasthyaQueue/
 
 Useful docs added in this repo:
 
-- [backend/README.md](D:/Study/Learning/Projects/SwasthyaQueue/backend/README.md)
-- [frontend/README.md](D:/Study/Learning/Projects/SwasthyaQueue/frontend/README.md)
-- [ml-service/README.md](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/README.md)
-- [docs/README.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/README.md)
-- [docs/WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
-- [docs/DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
+- [backend/README.md](backend/README.md)
+- [frontend/README.md](frontend/README.md)
+- [ml-service/README.md](ml-service/README.md)
+- [docs/README.md](docs/README.md)
+- [docs/FLOW_DIAGRAMS.md](docs/FLOW_DIAGRAMS.md)
+- [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
+- [docs/DEMO_CASE_STUDIES.md](docs/DEMO_CASE_STUDIES.md)
 
 ## Local Setup
 
@@ -359,13 +360,13 @@ Main routes:
 
 See the full workflow breakdown here:
 
-- [docs/WORKFLOWS.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
+- [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 
 ## Demo Case Studies
 
 Use these for presentation/demo storytelling:
 
-- [docs/DEMO_CASE_STUDIES.md](D:/Study/Learning/Projects/SwasthyaQueue/docs/DEMO_CASE_STUDIES.md)
+- [docs/DEMO_CASE_STUDIES.md](docs/DEMO_CASE_STUDIES.md)
 
 They include:
 

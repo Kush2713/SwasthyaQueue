@@ -28,13 +28,13 @@ Important:
 
 ## Current Files
 
-- [app.py](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/app.py)
+- [app.py](app.py)
   Flask app and prediction endpoint
-- [train_model.py](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/train_model.py)
+- [train_model.py](train_model.py)
   training/export utility for the model
-- [triage_model.pkl](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/triage_model.pkl)
+- [triage_model.pkl](triage_model.pkl)
   serialized trained model
-- [requirements.txt](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/requirements.txt)
+- [requirements.txt](requirements.txt)
   Python dependencies
 
 ## Local Run
@@ -130,6 +130,6 @@ Do not use ML to decide:
 
 ## Related Docs
 
-- [Root README](D:/Study/Learning/Projects/SwasthyaQueue/README.md)
-- [Backend README](D:/Study/Learning/Projects/SwasthyaQueue/backend/README.md)
-- [Workflows](D:/Study/Learning/Projects/SwasthyaQueue/docs/WORKFLOWS.md)
+- [Root README](../README.md)
+- [Backend README](../backend/README.md)
+- [Workflows](../docs/WORKFLOWS.md)
