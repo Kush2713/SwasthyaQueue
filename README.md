@@ -276,7 +276,7 @@ Main routes:
 - `/patient/book`
 - `/patient/token`
 - `/reception/dashboard`
-- `/staff/dashboard`
+- `/staff/dashboard` for nurse and doctor workspaces
 - `/case/queue/:queueId`
 - `/display`
 - `/tv`

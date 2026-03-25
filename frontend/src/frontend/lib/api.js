@@ -1,5 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
-const AUTH_SESSION_KEY = "swasthyaqueue_patient_session";
+const AUTH_SESSION_KEY = "swasthyaqueue_session";
 
 const DEPARTMENT_NAME_TO_ID = {
   "General Medicine": 1,
@@ -116,7 +116,14 @@ export function verifyPatientOtp(payload) {
   });
 }
 
-export function getCurrentPatient() {
+export function loginStaff(payload) {
+  return request("/api/auth/staff/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getCurrentSession() {
   return request("/api/auth/me");
 }
 

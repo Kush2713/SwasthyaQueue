@@ -4,6 +4,8 @@ const {
   determinePriorityLevel,
   getQueuePositionInfo,
 } = require("../services/queueService");
+const { logWorkflowEvent } = require("../utils/audit");
+const { getActorFromRequest } = require("../middleware/authMiddleware");
 
 function mapAppointmentRow(row) {
   return {
@@ -34,6 +36,9 @@ function mapAppointmentRow(row) {
     doctor: {
       diagnosis: row.diagnosis,
       prescription: row.prescription,
+      testsOrdered: row.tests_ordered,
+      followUpDate: row.follow_up_date,
+      followUpNotes: row.follow_up_notes,
       notes: row.doctor_notes,
       consultedByName: row.consulted_by_name,
       consultedAt: row.consulted_at,
@@ -132,6 +137,9 @@ async function getCasePayload(db, queueId) {
         a.assessed_at,
         a.diagnosis,
         a.prescription,
+        a.tests_ordered,
+        a.follow_up_date,
+        a.follow_up_notes,
         a.doctor_notes,
         a.consulted_by_name,
         a.consulted_at,
@@ -170,6 +178,9 @@ async function getCasePayload(db, queueId) {
         a.assessed_at,
         a.diagnosis,
         a.prescription,
+        a.tests_ordered,
+        a.follow_up_date,
+        a.follow_up_notes,
         a.doctor_notes,
         a.consulted_by_name,
         a.consulted_at,
@@ -186,6 +197,30 @@ async function getCasePayload(db, queueId) {
       LIMIT 8
     `,
     [current.patient_id]
+  );
+
+  const eventHistoryResult = await db.query(
+    `
+      SELECT
+        event_id,
+        actor_role,
+        actor_name,
+        action,
+        entity_type,
+        entity_id,
+        patient_id,
+        appointment_id,
+        queue_id,
+        details,
+        created_at
+      FROM workflow_events
+      WHERE patient_id = $1
+         OR appointment_id = $2
+         OR queue_id = $3
+      ORDER BY created_at DESC
+      LIMIT 25
+    `,
+    [current.patient_id, current.appointment_id, current.queue_id]
   );
 
   return {
@@ -236,6 +271,9 @@ async function getCasePayload(db, queueId) {
       doctor: {
         diagnosis: current.diagnosis,
         prescription: current.prescription,
+        testsOrdered: current.tests_ordered,
+        followUpDate: current.follow_up_date,
+        followUpNotes: current.follow_up_notes,
         notes: current.doctor_notes,
         consultedByName: current.consulted_by_name,
         consultedAt: current.consulted_at,
@@ -267,10 +305,26 @@ async function getCasePayload(db, queueId) {
       doctor: {
         diagnosis: row.diagnosis,
         prescription: row.prescription,
+        testsOrdered: row.tests_ordered,
+        followUpDate: row.follow_up_date,
+        followUpNotes: row.follow_up_notes,
         notes: row.doctor_notes,
         consultedByName: row.consulted_by_name,
         consultedAt: row.consulted_at,
       },
+    })),
+    eventHistory: eventHistoryResult.rows.map((row) => ({
+      eventId: row.event_id,
+      actorRole: row.actor_role,
+      actorName: row.actor_name,
+      action: row.action,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      patientId: row.patient_id,
+      appointmentId: row.appointment_id,
+      queueId: row.queue_id,
+      details: row.details,
+      createdAt: row.created_at,
     })),
   };
 }
@@ -279,12 +333,23 @@ async function saveDoctorUpdate(req, res) {
   const appointmentId = Number(req.params.id);
   const diagnosis = String(req.body.diagnosis || "").trim();
   const prescription = String(req.body.prescription || "").trim();
+  const testsOrdered = String(req.body.tests_ordered || "").trim();
+  const followUpDate = req.body.follow_up_date ? new Date(req.body.follow_up_date) : null;
+  const followUpNotes = String(req.body.follow_up_notes || "").trim();
   const doctorNotes = String(req.body.doctor_notes || "").trim();
-  const consultedByName = String(req.body.consulted_by_name || "Doctor").trim();
+  const actor = getActorFromRequest(req, {
+    role: "doctor",
+    name: "Doctor",
+  });
+  const consultedByName = actor.name || "Doctor";
   const completeVisit = Boolean(req.body.complete_visit);
 
   if (!Number.isFinite(appointmentId)) {
     return res.status(400).json({ error: "Invalid appointment id." });
+  }
+
+  if (followUpDate && Number.isNaN(followUpDate.getTime())) {
+    return res.status(400).json({ error: "Invalid follow-up date." });
   }
 
   const client = await pool.connect();
@@ -293,7 +358,7 @@ async function saveDoctorUpdate(req, res) {
 
     const appointmentResult = await client.query(
       `
-        SELECT appointment_id, queue_id, status
+        SELECT appointment_id, patient_id, queue_id, status
         FROM appointments
         WHERE appointment_id = $1
         LIMIT 1
@@ -318,14 +383,27 @@ async function saveDoctorUpdate(req, res) {
         UPDATE appointments
         SET diagnosis = $2,
             prescription = $3,
-            doctor_notes = $4,
-            consulted_by_name = $5,
+            tests_ordered = $4,
+            follow_up_date = $5,
+            follow_up_notes = $6,
+            doctor_notes = $7,
+            consulted_by_name = $8,
             consulted_at = CURRENT_TIMESTAMP,
-            status = $6,
+            status = $9,
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_id = $1
       `,
-      [appointmentId, diagnosis || null, prescription || null, doctorNotes || null, consultedByName, nextStatus]
+      [
+        appointmentId,
+        diagnosis || null,
+        prescription || null,
+        testsOrdered || null,
+        followUpDate ? followUpDate.toISOString() : null,
+        followUpNotes || null,
+        doctorNotes || null,
+        consultedByName,
+        nextStatus,
+      ]
     );
 
     if (appointment.queue_id) {
@@ -339,6 +417,25 @@ async function saveDoctorUpdate(req, res) {
           [appointment.queue_id, completeVisit ? "completed" : "in-progress"]
         );
       }
+
+    await logWorkflowEvent(client, {
+      actor,
+      action: completeVisit ? "appointment_completed" : "doctor_update_saved",
+      entityType: "appointment",
+      entityId: appointmentId,
+      patientId: appointment.patient_id,
+      appointmentId,
+      queueId: appointment.queue_id,
+      details: {
+        diagnosis: diagnosis || null,
+        prescription: prescription || null,
+        testsOrdered: testsOrdered || null,
+        followUpDate: followUpDate ? followUpDate.toISOString() : null,
+        followUpNotes: followUpNotes || null,
+        doctorNotes: doctorNotes || null,
+        status: nextStatus,
+      },
+    });
 
     const refreshed = await getAppointmentDetails(client, appointmentId);
     await client.query("COMMIT");
@@ -373,6 +470,7 @@ async function createAppointment(req, res) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const actor = getActorFromRequest(req);
 
     const departmentResult = await client.query(
       `
@@ -475,6 +573,22 @@ async function createAppointment(req, res) {
     const details = await getAppointmentDetails(client, appointment.appointment_id);
     const positionInfo = await getQueuePositionInfo(client, queue.queue_id, department_id);
 
+    await logWorkflowEvent(client, {
+      actor,
+      action: "appointment_created",
+      entityType: "appointment",
+      entityId: appointment.appointment_id,
+      patientId: req.auth.patient_id,
+      appointmentId: appointment.appointment_id,
+      queueId: queue.queue_id,
+      details: {
+        departmentId: department_id,
+        symptoms: symptoms.trim(),
+        preferredSlot: normalizedPreferredSlot,
+        priorityLevel,
+      },
+    });
+
     await client.query("COMMIT");
 
     res.status(201).json({
@@ -514,6 +628,10 @@ async function createQuickIntake(req, res) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const actor = getActorFromRequest(req, {
+      role: "receptionist",
+      name: String(req.body.created_by_name || "Front Desk").trim() || "Front Desk",
+    });
 
     const departmentResult = await client.query(
       "SELECT department_id FROM departments WHERE department_id = $1 LIMIT 1",
@@ -601,6 +719,22 @@ async function createQuickIntake(req, res) {
     );
 
     const casePayload = await getCasePayload(client, queue.queue_id);
+
+    await logWorkflowEvent(client, {
+      actor,
+      action: "quick_intake_created",
+      entityType: "appointment",
+      entityId: appointment.appointment_id,
+      patientId: patient.patient_id,
+      appointmentId: appointment.appointment_id,
+      queueId: queue.queue_id,
+      details: {
+        departmentId: department_id,
+        symptoms: appointment.symptoms,
+        priorityLevel,
+        mobileCaptured: Boolean(normalizedMobile),
+      },
+    });
 
     await client.query("COMMIT");
 
@@ -725,6 +859,7 @@ async function cancelAppointment(req, res) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const actor = getActorFromRequest(req);
 
     const result = await client.query(
       `
@@ -774,6 +909,19 @@ async function cancelAppointment(req, res) {
     }
 
     const refreshed = await getAppointmentDetails(client, appointmentId);
+
+    await logWorkflowEvent(client, {
+      actor,
+      action: "appointment_cancelled",
+      entityType: "appointment",
+      entityId: appointmentId,
+      patientId: req.auth.patient_id,
+      appointmentId,
+      queueId: appointment.queue_id || null,
+      details: {
+        previousStatus: appointment.status,
+      },
+    });
 
     await client.query("COMMIT");
 

@@ -23,7 +23,7 @@ It does not own the business rules. Instead, it:
 - captures user input
 - presents live queue and visit state
 - shows role-specific dashboards
-- helps hospital staff work faster with fewer repeated steps
+- helps hospital teams work faster with fewer repeated steps
 - calls backend APIs for all real workflow changes
 
 ## Role Surfaces
@@ -67,7 +67,7 @@ Reception can:
 
 Main screens:
 
-- staff dashboard in nurse mode
+- clinical dashboard in nurse mode
 - patient case page
 
 Nurse can:
@@ -82,7 +82,7 @@ Nurse can:
 
 Main screens:
 
-- staff dashboard in doctor mode
+- clinical dashboard in doctor mode
 - patient case page
 
 Doctor can:
@@ -113,7 +113,7 @@ Purpose:
 - `/patient/book`
 - `/patient/token`
 - `/reception/dashboard`
-- `/staff/dashboard`
+- `/staff/dashboard` for nurse and doctor workspaces
 - `/case/queue/:queueId`
 - `/display`
 - `/tv`
@@ -189,7 +189,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
 ## Suggested Future Frontend Improvements
 
 - stronger responsive behavior for hospital tablets
-- better staff-side keyboard-first interactions
+- better clinical workspace keyboard-first interactions
 - more structured doctor consultation forms
 - better patient history visualization
 - ABHA-linked patient identity and family member flows

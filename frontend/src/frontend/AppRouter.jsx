@@ -8,7 +8,7 @@ import StaffDashboard from "./pages/staff/StaffDashboard";
 import ReceptionDashboard from "./pages/reception/ReceptionDashboard";
 import PatientCasePage from "./pages/case/PatientCasePage";
 import LiveQueueDisplay from "./pages/display/LiveQueueDisplay";
-import { clearSession, getCurrentPatient, getStoredSession, saveSession } from "./lib/api";
+import { clearSession, getCurrentSession, getStoredSession, saveSession } from "./lib/api";
 
 function RoleGuard({ user, allowed, children }) {
   if (!user) return <Navigate to="/" replace />;
@@ -29,12 +29,12 @@ function AppRoutes() {
 
   useEffect(() => {
     const storedSession = getStoredSession();
-    if (!storedSession?.authToken || storedSession.role !== "patient") {
+    if (!storedSession?.authToken) {
       setAuthHydrated(true);
       return;
     }
 
-    getCurrentPatient()
+    getCurrentSession()
       .then((response) => {
         if (response?.user) {
           saveSession(response.user);
@@ -51,14 +51,16 @@ function AppRoutes() {
 
   const handleLogin = (loggedInUser) => {
     setUser(loggedInUser);
+    saveSession(loggedInUser);
     if (loggedInUser.role === "patient") {
-      saveSession(loggedInUser);
       setTokenData(null);
       navigate("/patient/dashboard");
     } else if (loggedInUser.role === "receptionist") {
       navigate("/reception/dashboard");
-    } else {
+    } else if (loggedInUser.role === "nurse" || loggedInUser.role === "doctor") {
       navigate("/staff/dashboard");
+    } else {
+      navigate("/");
     }
   };
 
@@ -127,7 +129,7 @@ function AppRoutes() {
       <Route
         path="/staff/dashboard"
         element={
-          <RoleGuard user={user} allowed={["staff", "nurse", "doctor"]}>
+          <RoleGuard user={user} allowed={["nurse", "doctor"]}>
             <StaffDashboard user={user} onLogout={handleLogout} />
           </RoleGuard>
         }
@@ -136,7 +138,7 @@ function AppRoutes() {
       <Route
         path="/case/queue/:queueId"
         element={
-          <RoleGuard user={user} allowed={["receptionist", "staff", "nurse", "doctor"]}>
+          <RoleGuard user={user} allowed={["receptionist", "nurse", "doctor"]}>
             <CaseRoute user={user} onBack={() => navigate(user?.role === "receptionist" ? "/reception/dashboard" : "/staff/dashboard")} />
           </RoleGuard>
         }

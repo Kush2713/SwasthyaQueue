@@ -31,8 +31,12 @@ function signTokenPayload(payload) {
 
 function issueAuthToken(user) {
   const payload = {
-    sub: user.accountId,
-    patient_id: user.patientId,
+    sub: user.accountId || user.userId,
+    account_id: user.accountId || null,
+    patient_id: user.patientId || null,
+    user_id: user.userId || null,
+    name: user.name || "",
+    designation: user.designation || "",
     role: user.role || "patient",
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
   };

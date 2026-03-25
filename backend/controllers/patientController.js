@@ -1,15 +1,27 @@
 const pool = require("../db");
+const { logWorkflowEvent } = require("../utils/audit");
+const { getActorFromRequest } = require("../middleware/authMiddleware");
 
 // Register Patient
 const registerPatient = async (req, res) => {
   try {
     const { name, age, gender, phone } = req.body;
+    const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
 
     // Insert into DB
     const result = await pool.query(
       "INSERT INTO patients (name, age, gender, phone) VALUES ($1, $2, $3, $4) RETURNING *",
       [name, age, gender, phone]
     );
+
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "patient_registered",
+      entityType: "patient",
+      entityId: result.rows[0].patient_id,
+      patientId: result.rows[0].patient_id,
+      details: { phone: phone || null },
+    });
 
     res.status(201).json({
       message: "Patient registered successfully",
@@ -25,6 +37,7 @@ const registerPatient = async (req, res) => {
 const updatePatientProfile = async (req, res) => {
   try {
     const patientId = req.auth.patient_id;
+    const actor = getActorFromRequest(req);
     const {
       name,
       age,
@@ -80,6 +93,18 @@ const updatePatientProfile = async (req, res) => {
       [patientId, email || null, mobile]
     );
 
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "patient_profile_updated",
+      entityType: "patient",
+      entityId: patientId,
+      patientId,
+      details: {
+        mobile: mobile || null,
+        email: email || null,
+      },
+    });
+
     res.json({
       message: "Patient profile updated successfully",
       patient: result.rows[0],
@@ -93,6 +118,7 @@ const updatePatientProfile = async (req, res) => {
 const updatePatientProfileById = async (req, res) => {
   try {
     const patientId = Number(req.params.id);
+    const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
     const {
       name,
       age,
@@ -155,6 +181,18 @@ const updatePatientProfileById = async (req, res) => {
       `,
       [patientId, email || null, mobile || null]
     );
+
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "patient_profile_updated_by_staff",
+      entityType: "patient",
+      entityId: patientId,
+      patientId,
+      details: {
+        mobile: mobile || null,
+        email: email || null,
+      },
+    });
 
     res.json({
       message: "Patient profile updated successfully.",

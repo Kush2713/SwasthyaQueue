@@ -251,7 +251,7 @@ Hosted setups can use:
 
 ## Future Backend Improvements
 
-- strict role-based authorization for staff roles
+- strict role-based authorization for receptionist, nurse, and doctor roles
 - audit logs for every queue state change
 - absent / recall / transfer-department endpoints
 - doctor test orders and follow-up endpoints

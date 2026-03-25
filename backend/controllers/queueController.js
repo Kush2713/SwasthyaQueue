@@ -3,6 +3,8 @@ const {
   determinePriorityLevel,
   pool,
 } = require("../services/queueService");
+const { logWorkflowEvent } = require("../utils/audit");
+const { getActorFromRequest } = require("../middleware/authMiddleware");
 
 function toNullableNumber(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -42,6 +44,7 @@ function validateTriageVitals({ temperatureC, pulseRate, spo2, weightKg, bloodPr
 const addToQueue = async (req, res) => {
   try {
     const { patient_id, department_id, symptoms, pain_scale, age, appointment_id } = req.body;
+    const actor = getActorFromRequest(req);
 
     if (!patient_id || !department_id) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -74,6 +77,20 @@ const addToQueue = async (req, res) => {
         [appointment_id, queue.queue_id]
       );
     }
+
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "queue_entry_created",
+      entityType: "queue",
+      entityId: queue.queue_id,
+      patientId: patient_id,
+      appointmentId: appointment_id || null,
+      queueId: queue.queue_id,
+      details: {
+        departmentId: department_id,
+        priorityLevel: priority_level,
+      },
+    });
 
     res.status(201).json({
       message: "Added to queue successfully",
@@ -120,6 +137,9 @@ const getQueueByDepartment = async (req, res) => {
           ,
           a.diagnosis,
           a.prescription,
+          a.tests_ordered,
+          a.follow_up_date,
+          a.follow_up_notes,
           a.doctor_notes,
           a.consulted_by_name,
           a.consulted_at
@@ -183,6 +203,9 @@ const checkTurn = async (req, res) => {
           ,
           a.diagnosis,
           a.prescription,
+          a.tests_ordered,
+          a.follow_up_date,
+          a.follow_up_notes,
           a.doctor_notes,
           a.consulted_by_name,
           a.consulted_at
@@ -219,6 +242,7 @@ const checkTurn = async (req, res) => {
 const callNextPatient = async (req, res) => {
   try {
     const { department_id } = req.body;
+    const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
 
     const result = await pool.query(
       `
@@ -254,6 +278,20 @@ const callNextPatient = async (req, res) => {
       );
     }
 
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "queue_called_next",
+      entityType: "queue",
+      entityId: patient.queue_id,
+      patientId: patient.patient_id,
+      appointmentId: patient.appointment_id || null,
+      queueId: patient.queue_id,
+      details: {
+        departmentId: department_id,
+        tokenNumber: patient.token_number,
+      },
+    });
+
     res.json({
       message: "Next patient called",
       patient,
@@ -268,6 +306,7 @@ const callNextPatient = async (req, res) => {
 const completePatient = async (req, res) => {
   try {
     const { queue_id } = req.body;
+    const actor = getActorFromRequest(req, { role: "doctor", name: "Doctor" });
 
     const result = await pool.query(
       `
@@ -289,6 +328,18 @@ const completePatient = async (req, res) => {
         `,
         [result.rows[0].appointment_id]
       );
+    }
+
+    if (result.rows[0]) {
+      await logWorkflowEvent(pool, {
+        actor,
+        action: "queue_completed",
+        entityType: "queue",
+        entityId: result.rows[0].queue_id,
+        patientId: result.rows[0].patient_id,
+        appointmentId: result.rows[0].appointment_id || null,
+        queueId: result.rows[0].queue_id,
+      });
     }
 
     res.json({
@@ -351,8 +402,9 @@ const flagUrgentReview = async (req, res) => {
   try {
     const queueId = Number(req.params.queue_id);
     const reason = String(req.body.reason || "").trim();
-    const requestedByRole = req.body.requested_by_role || "receptionist";
-    const requestedByName = req.body.requested_by_name || "Front Desk";
+    const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
+    const requestedByRole = actor.role || "receptionist";
+    const requestedByName = actor.name || "Front Desk";
 
     if (!Number.isFinite(queueId)) {
       return res.status(400).json({ error: "Invalid queue id." });
@@ -381,6 +433,17 @@ const flagUrgentReview = async (req, res) => {
       return res.status(404).json({ error: "Queue entry not found for urgent review." });
     }
 
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "urgent_review_requested",
+      entityType: "queue",
+      entityId: queueId,
+      patientId: result.rows[0].patient_id,
+      appointmentId: result.rows[0].appointment_id || null,
+      queueId,
+      details: { reason },
+    });
+
     res.json({
       message: "Patient flagged for urgent nurse review.",
       queue: result.rows[0],
@@ -395,8 +458,9 @@ const approvePriorityOverride = async (req, res) => {
   try {
     const queueId = Number(req.params.queue_id);
     const priorityLevel = Number(req.body.priority_level);
-    const escalatedByRole = req.body.escalated_by_role || "nurse";
-    const escalatedByName = req.body.escalated_by_name || "Triage Nurse";
+    const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
+    const escalatedByRole = actor.role || "nurse";
+    const escalatedByName = actor.name || "Triage Nurse";
     const escalationNote = String(req.body.note || "").trim();
 
     if (!Number.isFinite(queueId)) {
@@ -427,6 +491,20 @@ const approvePriorityOverride = async (req, res) => {
       return res.status(404).json({ error: "Queue entry not found for escalation." });
     }
 
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "queue_priority_overridden",
+      entityType: "queue",
+      entityId: queueId,
+      patientId: result.rows[0].patient_id,
+      appointmentId: result.rows[0].appointment_id || null,
+      queueId,
+      details: {
+        priorityLevel,
+        note: escalationNote || null,
+      },
+    });
+
     res.json({
       message: "Priority updated successfully.",
       queue: result.rows[0],
@@ -440,7 +518,8 @@ const approvePriorityOverride = async (req, res) => {
 const recordNurseTriage = async (req, res) => {
   try {
     const queueId = Number(req.params.queue_id);
-    const assessedByName = String(req.body.assessed_by_name || "Triage Nurse").trim();
+    const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
+    const assessedByName = String(actor.name || req.body.assessed_by_name || "Triage Nurse").trim();
     const triageNotes = String(req.body.triage_notes || "").trim();
     const temperatureC = toNullableNumber(req.body.temperature_c);
     const pulseRate = toNullableNumber(req.body.pulse_rate);
@@ -502,6 +581,23 @@ const recordNurseTriage = async (req, res) => {
       return res.status(404).json({ error: "Active appointment not found for triage." });
     }
 
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "triage_saved",
+      entityType: "appointment",
+      entityId: result.rows[0].appointment_id,
+      appointmentId: result.rows[0].appointment_id,
+      queueId,
+      details: {
+        temperatureC,
+        bloodPressure: bloodPressure || null,
+        pulseRate,
+        spo2,
+        weightKg,
+        triageNotes: triageNotes || null,
+      },
+    });
+
     res.json({
       message: "Nurse assessment saved successfully.",
       triage: result.rows[0],
@@ -515,7 +611,8 @@ const recordNurseTriage = async (req, res) => {
 const markReadyForDoctor = async (req, res) => {
   try {
     const queueId = Number(req.params.queue_id);
-    const assessedByName = String(req.body.assessed_by_name || "Triage Nurse").trim();
+    const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
+    const assessedByName = String(actor.name || req.body.assessed_by_name || "Triage Nurse").trim();
     const triageNotes = String(req.body.triage_notes || "").trim();
     const temperatureC = toNullableNumber(req.body.temperature_c);
     const pulseRate = toNullableNumber(req.body.pulse_rate);
@@ -556,7 +653,7 @@ const markReadyForDoctor = async (req, res) => {
         WHERE q.queue_id = $1
           AND q.appointment_id = a.appointment_id
           AND q.status IN ('waiting', 'in-progress')
-        RETURNING a.appointment_id, a.status, a.assessed_by_name, a.assessed_at
+        RETURNING a.appointment_id, a.patient_id, a.status, a.assessed_by_name, a.assessed_at
       `,
       [queueId, assessedByName, temperatureC, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null]
     );
@@ -564,6 +661,24 @@ const markReadyForDoctor = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ error: "Active appointment not found for doctor handoff." });
     }
+
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "marked_ready_for_doctor",
+      entityType: "appointment",
+      entityId: result.rows[0].appointment_id,
+      patientId: result.rows[0].patient_id,
+      appointmentId: result.rows[0].appointment_id,
+      queueId,
+      details: {
+        temperatureC,
+        bloodPressure: bloodPressure || null,
+        pulseRate,
+        spo2,
+        weightKg,
+        triageNotes: triageNotes || null,
+      },
+    });
 
     res.json({
       message: "Patient marked ready for doctor.",

@@ -162,6 +162,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
               >
                 {hasActiveAppointment ? "Active Visit in Progress" : "Book New Visit"}
               </button>
+              <button type="button" onClick={onRegister} style={ghostBtn}>Edit Profile / Book</button>
               <button type="button" onClick={loadDashboardData} style={ghostBtn}>Refresh</button>
               <button type="button" onClick={onLogout} style={ghostBtn}>Logout</button>
             </div>
@@ -248,6 +249,10 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
                   </div>
                   <div style={{ marginTop: 8, fontSize: 13, color: "#334155" }}>{appointment.symptoms}</div>
                   {appointment.preferredSlot ? <div style={{ marginTop: 6, fontSize: 12, color: "#64748B" }}>Preferred slot: {formatDateTime(appointment.preferredSlot)}</div> : null}
+                  {appointment.doctor?.diagnosis ? <div style={{ marginTop: 6, fontSize: 13, color: "#334155" }}>Diagnosis: {appointment.doctor.diagnosis}</div> : null}
+                  {appointment.doctor?.prescription ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Prescription / Advice: {appointment.doctor.prescription}</div> : null}
+                  {appointment.doctor?.testsOrdered ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Tests: {appointment.doctor.testsOrdered}</div> : null}
+                  {appointment.doctor?.followUpDate ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>Follow-up: {formatDateTime(appointment.doctor.followUpDate)}</div> : null}
                 </div>
               ))}
             </div>

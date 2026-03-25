@@ -10,13 +10,13 @@ const {
   cancelAppointment,
   saveDoctorUpdate,
 } = require("../controllers/appointmentController");
-const { requirePatientAuth } = require("../middleware/authMiddleware");
+const { requirePatientAuth, requireRoles } = require("../middleware/authMiddleware");
 
 router.get("/me/active", requirePatientAuth, getMyActiveAppointment);
 router.get("/me/history", requirePatientAuth, getMyAppointmentHistory);
-router.get("/case/queue/:queue_id", getCaseByQueueId);
-router.post("/quick-intake", createQuickIntake);
-router.post("/:id/doctor-update", saveDoctorUpdate);
+router.get("/case/queue/:queue_id", requireRoles(["receptionist", "nurse", "doctor"]), getCaseByQueueId);
+router.post("/quick-intake", requireRoles(["receptionist"]), createQuickIntake);
+router.post("/:id/doctor-update", requireRoles(["doctor"]), saveDoctorUpdate);
 router.post("/:id/cancel", requirePatientAuth, cancelAppointment);
 router.post("/", requirePatientAuth, createAppointment);
 

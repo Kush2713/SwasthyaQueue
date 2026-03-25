@@ -1,41 +1,11 @@
 import { useMemo, useState } from "react";
 
 import {
+  loginStaff,
   requestPatientOtp,
   signupPatientAccount,
   verifyPatientOtp,
 } from "../lib/api";
-
-const MOCK_STAFF_USERS = {
-  receptionist01: {
-    password: "recept123",
-    role: "receptionist",
-    name: "Anita Reddy",
-    id: "R001",
-    designation: "Receptionist",
-  },
-  nurse01: {
-    password: "nurse123",
-    role: "nurse",
-    name: "Sujatha Rao",
-    id: "N001",
-    designation: "Nurse | Triage",
-  },
-  staff01: {
-    password: "staff123",
-    role: "receptionist",
-    name: "Anita Reddy",
-    id: "R001",
-    designation: "Receptionist",
-  },
-  doctor01: {
-    password: "doc123",
-    role: "doctor",
-    name: "Dr. S. Mehta",
-    id: "D001",
-    designation: "Doctor | General Medicine",
-  },
-};
 
 const labelStyle = "mb-1.5 block text-sm font-semibold text-slate-700";
 const inputStyle =
@@ -44,7 +14,6 @@ const inputStyle =
 const demoRows = [
   { userId: "receptionist01", password: "recept123" },
   { userId: "nurse01", password: "nurse123" },
-  { userId: "staff01", password: "staff123" },
   { userId: "doctor01", password: "doc123" },
 ];
 
@@ -193,20 +162,20 @@ export default function LoginPage({ onLogin }) {
     event.preventDefault();
     setLoading(true);
     setError("");
-    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const key = staffUserId.trim().toLowerCase();
-    const matchedUser = MOCK_STAFF_USERS[key];
+    try {
+      const response = await loginStaff({
+        userId: staffUserId.trim(),
+        password: staffPassword.trim(),
+      });
 
-    if (!matchedUser || matchedUser.password !== staffPassword.trim()) {
+      if (typeof onLogin === "function") {
+        onLogin(response.user);
+      }
+    } catch (err) {
+      setError(err.message || "Invalid staff credentials. Please check and try again.");
+    } finally {
       setLoading(false);
-      setError("Invalid staff credentials. Please check and try again.");
-      return;
-    }
-
-    setLoading(false);
-    if (typeof onLogin === "function") {
-      onLogin({ ...matchedUser, userId: key });
     }
   };
 

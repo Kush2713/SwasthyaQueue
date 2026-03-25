@@ -54,6 +54,9 @@ async function ensureSchema() {
       assessed_at TIMESTAMP,
       diagnosis TEXT,
       prescription TEXT,
+      tests_ordered TEXT,
+      follow_up_date TIMESTAMP,
+      follow_up_notes TEXT,
       doctor_notes TEXT,
       consulted_by_name VARCHAR(120),
       consulted_at TIMESTAMP,
@@ -76,6 +79,9 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS assessed_at TIMESTAMP,
     ADD COLUMN IF NOT EXISTS diagnosis TEXT,
     ADD COLUMN IF NOT EXISTS prescription TEXT,
+    ADD COLUMN IF NOT EXISTS tests_ordered TEXT,
+    ADD COLUMN IF NOT EXISTS follow_up_date TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS follow_up_notes TEXT,
     ADD COLUMN IF NOT EXISTS doctor_notes TEXT,
     ADD COLUMN IF NOT EXISTS consulted_by_name VARCHAR(120),
     ADD COLUMN IF NOT EXISTS consulted_at TIMESTAMP
@@ -96,8 +102,36 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS workflow_events (
+      event_id SERIAL PRIMARY KEY,
+      actor_role VARCHAR(30),
+      actor_name VARCHAR(120),
+      actor_user_id VARCHAR(80),
+      actor_account_id INTEGER,
+      action VARCHAR(80) NOT NULL,
+      entity_type VARCHAR(40),
+      entity_id VARCHAR(80),
+      patient_id INTEGER REFERENCES patients(patient_id) ON DELETE SET NULL,
+      appointment_id INTEGER REFERENCES appointments(appointment_id) ON DELETE SET NULL,
+      queue_id INTEGER REFERENCES queue(queue_id) ON DELETE SET NULL,
+      details JSONB,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_appointments_patient_created
     ON appointments (patient_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_workflow_events_patient_created
+    ON workflow_events (patient_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_workflow_events_appointment_created
+    ON workflow_events (appointment_id, created_at DESC)
   `);
 
     await pool.query(`

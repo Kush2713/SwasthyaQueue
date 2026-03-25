@@ -9,6 +9,8 @@ const {
   normalizeIdentifier,
   normalizeMobile,
 } = require("../utils/auth");
+const { getStaffUserByCredentials, getStaffUserById, sanitizeStaffUser } = require("../utils/staffUsers");
+const { logWorkflowEvent } = require("../utils/audit");
 
 function sanitizePatientUser(row, token) {
   return {
@@ -129,6 +131,14 @@ async function signupPatient(req, res) {
     );
 
     const otp = await storeOtp(client, accountResult.rows[0].account_id);
+    await logWorkflowEvent(client, {
+      actor: { role: "patient", accountId: accountResult.rows[0].account_id, name: patientResult.rows[0].name },
+      action: "patient_account_created",
+      entityType: "patient_account",
+      entityId: accountResult.rows[0].account_id,
+      patientId: patientResult.rows[0].patient_id,
+      details: { accountSource: "self" },
+    });
     await client.query("COMMIT");
 
     res.status(201).json({
@@ -216,6 +226,21 @@ async function createAssistedPatientAccount(req, res) {
         assistedReference,
       ]
     );
+
+    await logWorkflowEvent(client, {
+      actor: {
+        role: req.body.createdByRole || "receptionist",
+        name: req.body.createdByName || "Front Desk",
+      },
+      action: "assisted_patient_account_created",
+      entityType: "patient_account",
+      entityId: accountResult.rows[0].account_id,
+      patientId: patientResult.rows[0].patient_id,
+      details: {
+        accountSource: "staff-assisted",
+        assistedReference,
+      },
+    });
 
     await client.query("COMMIT");
 
@@ -345,6 +370,19 @@ async function verifyPatientOtp(req, res) {
       role: "patient",
     });
 
+    await logWorkflowEvent(pool, {
+      actor: {
+        role: "patient",
+        accountId: account.account_id,
+        name: account.name,
+      },
+      action: "patient_login",
+      entityType: "patient_account",
+      entityId: account.account_id,
+      patientId: account.patient_id,
+      details: { channel: identifier.type },
+    });
+
     res.json({
       message: "Login successful.",
       user: sanitizePatientUser(account, token),
@@ -355,7 +393,50 @@ async function verifyPatientOtp(req, res) {
   }
 }
 
-async function getCurrentPatient(req, res) {
+async function loginStaff(req, res) {
+  const matchedUser = getStaffUserByCredentials(req.body.userId, req.body.password);
+
+  if (!matchedUser) {
+    return res.status(401).json({ error: "Invalid staff credentials." });
+  }
+
+  const token = issueAuthToken({
+    userId: matchedUser.userId,
+    role: matchedUser.role,
+    name: matchedUser.name,
+    designation: matchedUser.designation,
+  });
+
+  await logWorkflowEvent(pool, {
+    actor: {
+      role: matchedUser.role,
+      name: matchedUser.name,
+      userId: matchedUser.userId,
+    },
+    action: "staff_login",
+    entityType: "staff_user",
+    entityId: matchedUser.userId,
+    details: { designation: matchedUser.designation },
+  });
+
+  res.json({
+    message: "Staff login successful.",
+    user: sanitizeStaffUser(matchedUser, token),
+  });
+}
+
+async function getCurrentSession(req, res) {
+  if (req.auth.role !== "patient") {
+    const staffUser = getStaffUserById(req.auth.user_id);
+    if (!staffUser) {
+      return res.status(404).json({ error: "Staff user not found." });
+    }
+
+    return res.json({
+      user: sanitizeStaffUser(staffUser, req.headers.authorization?.slice(7)),
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -398,5 +479,6 @@ module.exports = {
   createAssistedPatientAccount,
   requestPatientOtp,
   verifyPatientOtp,
-  getCurrentPatient,
+  loginStaff,
+  getCurrentSession,
 };

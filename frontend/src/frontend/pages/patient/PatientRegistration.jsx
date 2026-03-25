@@ -128,6 +128,9 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileNotice, setProfileNotice] = useState("");
+  const [editingProfile, setEditingProfile] = useState(false);
   const [success, setSuccess] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [availableDepartments, setAvailableDepartments] = useState([]);
@@ -193,7 +196,8 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 120) return "Patient profile age is missing or invalid.";
     if (!form.gender) return "Patient profile gender is missing.";
     if (!isValidIndianMobile(form.mobile)) return "Patient mobile number is missing or invalid.";
-    if (!isValidIndianMobile(form.emergencyContact)) return "Emergency contact is required in the saved profile.";
+    if (!normalizeIndianMobile(form.emergencyContact)) return "Emergency contact is required in the saved profile.";
+    if (!isValidIndianMobile(form.emergencyContact)) return "Emergency contact in the saved profile is invalid. Please update it before booking.";
     return "";
   };
 
@@ -301,6 +305,77 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     }
   };
 
+  const saveProfileEdits = async () => {
+    const validationError = checkStep1();
+    if (validationError && !validationError.includes("Emergency contact in the saved profile is invalid") && !validationError.includes("Patient mobile number is missing or invalid.") && !validationError.includes("Patient profile")) {
+      setError(validationError);
+      return;
+    }
+
+    if (!form.name.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+    if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 120) {
+      setError("Please enter a valid age.");
+      return;
+    }
+    if (!form.gender) {
+      setError("Please select gender.");
+      return;
+    }
+    if (!isValidIndianMobile(form.mobile)) {
+      setError("Please enter a valid patient mobile number.");
+      return;
+    }
+    if (!isValidIndianMobile(form.emergencyContact)) {
+      setError("Please enter a valid emergency contact number.");
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileNotice("");
+    setError("");
+
+    try {
+      const { updateMyPatientProfile, saveSession, getStoredSession } = await import("../../lib/api");
+      await updateMyPatientProfile({
+        name: form.name.trim(),
+        age: Number(form.age),
+        gender: form.gender,
+        mobile: normalizeIndianMobile(form.mobile),
+        email: user?.email || null,
+        address: form.address?.trim() || null,
+        emergencyContact: normalizeIndianMobile(form.emergencyContact),
+        bloodGroup: form.bloodGroup?.trim() || null,
+        allergies: form.allergies?.trim() || null,
+        chronicConditions: form.chronicConditions?.trim() || null,
+      });
+
+      const existingSession = getStoredSession() || {};
+      saveSession({
+        ...existingSession,
+        ...user,
+        name: form.name.trim(),
+        age: Number(form.age),
+        gender: form.gender,
+        mobile: normalizeIndianMobile(form.mobile),
+        address: form.address?.trim() || null,
+        emergencyContact: normalizeIndianMobile(form.emergencyContact),
+        bloodGroup: form.bloodGroup?.trim() || null,
+        allergies: form.allergies?.trim() || null,
+        chronicConditions: form.chronicConditions?.trim() || null,
+      });
+
+      setProfileNotice("Saved details updated for future visits.");
+      setEditingProfile(false);
+    } catch (err) {
+      setError(err.message || "Unable to update saved profile right now.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const reset = () => {
     setStep(1);
     setError("");
@@ -325,25 +400,88 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
         {!success ? (
           <>
             <StepBar step={step} />
-            <FormCard title={`Step ${step} | ${step === 1 ? "Profile Summary" : step === 2 ? "Symptoms" : "Review and Confirm"}`} subtitle="Book New OPD Visit">
+            <FormCard
+              title={`Step ${step} | ${step === 1 ? "Profile Summary" : step === 2 ? "Symptoms" : "Review and Confirm"}`}
+              subtitle="Book New OPD Visit"
+              headerAction={step === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => { setEditingProfile((current) => !current); setProfileNotice(""); }}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.28)",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#fff",
+                    padding: "8px 12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {editingProfile ? "Close Edit" : "Edit Details"}
+                </button>
+              ) : null}
+            >
               {error ? <ErrorBanner message={error} /> : null}
 
               {step === 1 ? (
                 <>
                   {ageNote ? <NoticeBox message={ageNote} /> : null}
+                  {profileNotice ? <SuccessBanner message={profileNotice} /> : null}
                   <div style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#F8FAFC", marginBottom: 12 }}>
-                    <SummaryRow label="Full Name" value={form.name} />
-                    <SummaryRow label="Age / Gender" value={`${form.age} / ${form.gender}`} />
-                    <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
-                    <SummaryRow label="Emergency Contact" value={formatIndianMobile(form.emergencyContact)} />
-                    <SummaryRow label="Blood Group" value={form.bloodGroup || "-"} />
-                    <SummaryRow label="Address" value={form.address || "-"} />
-                    <SummaryRow label="Allergies" value={form.allergies || "-"} />
-                    <SummaryRow label="Conditions" value={form.chronicConditions || "-"} noBorder />
+                    {editingProfile ? (
+                      <>
+                        <EditableRow label="Full Name" noBorder={false}>
+                          <input value={form.name} onChange={(event) => setField("name", event.target.value)} style={summaryInputStyle} />
+                        </EditableRow>
+                        <EditableSplitRow
+                          label="Age / Gender"
+                          noBorder={false}
+                          left={<input value={form.age} onChange={(event) => setField("age", String(event.target.value).replace(/\D/g, "").slice(0, 3))} style={summaryInputStyle} />}
+                          right={
+                            <select value={form.gender} onChange={(event) => setField("gender", event.target.value)} style={summaryInputStyle}>
+                              <option value="">Select</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          }
+                        />
+                        <EditableRow label="Mobile" noBorder={false}>
+                          <input value={form.mobile} onChange={(event) => setField("mobile", normalizeIndianMobile(event.target.value))} style={summaryInputStyle} placeholder="9876543210" />
+                        </EditableRow>
+                        <EditableRow label="Emergency Contact" noBorder={false}>
+                          <input value={form.emergencyContact} onChange={(event) => setField("emergencyContact", normalizeIndianMobile(event.target.value))} style={summaryInputStyle} placeholder="9876543210" />
+                        </EditableRow>
+                        <EditableRow label="Blood Group" noBorder={false}>
+                          <input value={form.bloodGroup} onChange={(event) => setField("bloodGroup", event.target.value)} style={summaryInputStyle} />
+                        </EditableRow>
+                        <EditableRow label="Address" noBorder={false}>
+                          <input value={form.address} onChange={(event) => setField("address", event.target.value)} style={summaryInputStyle} />
+                        </EditableRow>
+                        <EditableRow label="Allergies" noBorder={false}>
+                          <input value={form.allergies} onChange={(event) => setField("allergies", event.target.value)} style={summaryInputStyle} />
+                        </EditableRow>
+                        <EditableRow label="Conditions" noBorder>
+                          <input value={form.chronicConditions} onChange={(event) => setField("chronicConditions", event.target.value)} style={summaryInputStyle} />
+                        </EditableRow>
+                      </>
+                    ) : (
+                      <>
+                        <SummaryRow label="Full Name" value={form.name} />
+                        <SummaryRow label="Age / Gender" value={`${form.age} / ${form.gender}`} />
+                        <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
+                        <SummaryRow label="Emergency Contact" value={formatIndianMobile(form.emergencyContact)} />
+                        <SummaryRow label="Blood Group" value={form.bloodGroup || "-"} />
+                        <SummaryRow label="Address" value={form.address || "-"} />
+                        <SummaryRow label="Allergies" value={form.allergies || "-"} />
+                        <SummaryRow label="Conditions" value={form.chronicConditions || "-"} noBorder />
+                      </>
+                    )}
                   </div>
                   <div style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
                     These details come from your registered patient account, so you do not need to fill them again for every visit.
                   </div>
+                  {editingProfile ? <NavRow><div /><PrimaryBtn onClick={saveProfileEdits} disabled={profileSaving}>{profileSaving ? "Saving..." : "Save Saved Details"}</PrimaryBtn></NavRow> : null}
                   <NavRow><GhostBtn onClick={onBack} disabled={!onBack}>Back to Dashboard</GhostBtn><PrimaryBtn onClick={next}>Continue to Symptoms</PrimaryBtn></NavRow>
                 </>
               ) : null}
@@ -466,8 +604,22 @@ function StepBar({ step }) {
   return <div style={{ display: "flex", marginBottom: 12 }}>{labels.map((label, index) => { const number = index + 1; const done = number < step; const active = number === step; return <div key={label} style={{ flex: 1, textAlign: "center", position: "relative" }}>{index ? <div style={{ position: "absolute", top: 14, left: "-50%", width: "100%", height: 2, background: number <= step ? COLORS.navy : "#CBD5E1" }} /> : null}<div style={{ width: 28, height: 28, borderRadius: "50%", margin: "0 auto", background: done ? COLORS.green : active ? COLORS.navy : "#94A3B8", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, position: "relative", zIndex: 1 }}>{done ? "OK" : number}</div><div style={{ fontSize: 12, marginTop: 6, color: "#334155", fontWeight: active ? 700 : 500 }}>{label}</div></div>; })}</div>;
 }
 
-function FormCard({ title, subtitle, children }) { return <section style={{ border: "1px solid #CBD5E1", borderRadius: 12, overflow: "hidden", background: COLORS.cardBg }}><div style={{ background: COLORS.navy, color: "#fff", padding: "10px 12px" }}><div style={{ fontWeight: 800 }}>{title}</div><div style={{ fontSize: 12, color: COLORS.skyText }}>{subtitle}</div></div><div style={{ padding: 12 }}>{children}</div></section>; }
+function FormCard({ title, subtitle, headerAction, children }) {
+  return (
+    <section style={{ border: "1px solid #CBD5E1", borderRadius: 12, overflow: "hidden", background: COLORS.cardBg }}>
+      <div style={{ background: COLORS.navy, color: "#fff", padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 800 }}>{title}</div>
+          <div style={{ fontSize: 12, color: COLORS.skyText }}>{subtitle}</div>
+        </div>
+        {headerAction ? <div>{headerAction}</div> : null}
+      </div>
+      <div style={{ padding: 12 }}>{children}</div>
+    </section>
+  );
+}
 function ErrorBanner({ message }) { return <div style={{ border: "1px solid #FCA5A5", background: "#FEF2F2", color: COLORS.errorRed, borderRadius: 8, padding: 10, marginBottom: 10, fontSize: 13, fontWeight: 700 }}>{message}</div>; }
+function SuccessBanner({ message }) { return <div style={{ border: "1px solid #86EFAC", background: "#F0FDF4", color: "#166534", borderRadius: 8, padding: 10, marginBottom: 10, fontSize: 13, fontWeight: 700 }}>{message}</div>; }
 function NoticeBox({ message }) { return <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", borderRadius: 8, padding: 10, color: "#92400E", marginBottom: 12, fontSize: 13 }}>{message}</div>; }
 function Field({ label, children }) { return <label style={{ display: "block", marginBottom: 12 }}><span style={labelStyle}>{label}</span>{children}</label>; }
 function Input({ value, onChange, placeholder }) { return <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} style={inputStyle} />; }
@@ -477,9 +629,16 @@ function NavRow({ children }) { return <div style={{ display: "flex", justifyCon
 function PrimaryBtn({ children, onClick, disabled }) { return <button type="button" onClick={onClick} disabled={disabled} style={{ border: "none", borderRadius: 8, background: disabled ? "#94A3B8" : COLORS.navy, color: "#fff", padding: "10px 14px", fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer" }}>{children}</button>; }
 function GhostBtn({ children, onClick, disabled }) { return <button type="button" onClick={onClick} disabled={disabled} style={{ border: "1px solid #CBD5E1", borderRadius: 8, background: "#fff", color: "#334155", padding: "10px 14px", fontWeight: 700, opacity: disabled ? 0.5 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>{children}</button>; }
 function SummaryRow({ label, value, noBorder }) { return <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 8, padding: "9px 10px", borderBottom: noBorder ? "none" : "1px solid #E2E8F0", fontSize: 13 }}><strong style={{ color: "#334155" }}>{label}</strong><span style={{ color: "#0F172A" }}>{value}</span></div>; }
+function EditableRow({ label, children, noBorder }) {
+  return <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 8, padding: "9px 10px", borderBottom: noBorder ? "none" : "1px solid #E2E8F0", fontSize: 13, alignItems: "center" }}><strong style={{ color: "#334155" }}>{label}</strong><div>{children}</div></div>;
+}
+function EditableSplitRow({ label, left, right, noBorder }) {
+  return <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 8, padding: "9px 10px", borderBottom: noBorder ? "none" : "1px solid #E2E8F0", fontSize: 13, alignItems: "center" }}><strong style={{ color: "#334155" }}>{label}</strong><div style={{ display: "grid", gridTemplateColumns: "110px minmax(130px, 160px)", gap: 8 }}>{left}{right}</div></div>;
+}
 function InfoCell({ label, value }) { return <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, background: "#F8FAFC", padding: 10 }}><div style={{ fontSize: 11, color: "#64748B" }}>{label}</div><div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{value}</div></div>; }
+const summaryInputStyle = { width: "100%", border: "1px solid #CBD5E1", borderRadius: 8, padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box", background: "#fff" };
 function TricolorStrip() { return <div style={{ display: "flex", height: 5 }}><div style={{ flex: 1, background: COLORS.saffron }} /><div style={{ flex: 1, background: "#fff" }} /><div style={{ flex: 1, background: COLORS.green }} /></div>; }
-function GovHeader({ onBack }) { return <header style={{ background: COLORS.navyDark, color: "#fff", padding: 12 }}><div style={{ maxWidth: 920, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}>{onBack ? <button type="button" onClick={onBack} style={{ border: "1px solid rgba(255,255,255,.35)", background: "rgba(255,255,255,.08)", color: "#fff", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>Back</button> : null}<div style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>SQ</div><div><div style={{ fontWeight: 800 }}>SwasthyaQueue</div><div style={{ fontSize: 12, color: COLORS.skyText }}>Smart OPD Queue and Registration</div></div></div><div style={{ fontSize: 12, color: COLORS.skyText, fontWeight: 700 }}>New OPD Registration</div></div></header>; }
+function GovHeader() { return <header style={{ background: COLORS.navyDark, color: "#fff", padding: 12 }}><div style={{ maxWidth: 920, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>SQ</div><div><div style={{ fontWeight: 800 }}>SwasthyaQueue</div><div style={{ fontSize: 12, color: COLORS.skyText }}>Smart OPD Queue and Registration</div></div></div><div style={{ fontSize: 12, color: COLORS.skyText, fontWeight: 700 }}>New OPD Registration</div></div></header>; }
 function GovFooter() { return <footer style={{ background: COLORS.navyDark, color: COLORS.skyText, padding: 10, fontSize: 12, textAlign: "center" }}>Copyright 2026 SwasthyaQueue | Government Hospital OPD Digital Queue System</footer>; }
 
 export function computeRisk(checkedSymptoms, age, gender, painScale) {

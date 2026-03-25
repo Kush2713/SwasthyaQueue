@@ -130,6 +130,9 @@ export default function StaffDashboard({ user, onLogout }) {
           assessedAt: patient.assessed_at || null,
           diagnosis: patient.diagnosis || "",
           prescription: patient.prescription || "",
+          testsOrdered: patient.tests_ordered || "",
+          followUpDate: patient.follow_up_date || "",
+          followUpNotes: patient.follow_up_notes || "",
           doctorNotes: patient.doctor_notes || "",
           consultedByName: patient.consulted_by_name || "",
           consultedAt: patient.consulted_at || null,
@@ -309,6 +312,9 @@ export default function StaffDashboard({ user, onLogout }) {
       return {
         diagnosis: patient.diagnosis || "",
         prescription: patient.prescription || "",
+        tests_ordered: patient.testsOrdered || "",
+        follow_up_date: patient.followUpDate ? String(patient.followUpDate).slice(0, 16) : "",
+        follow_up_notes: patient.followUpNotes || "",
         doctor_notes: patient.doctorNotes || "",
       };
     },
@@ -828,6 +834,19 @@ export default function StaffDashboard({ user, onLogout }) {
                           <Field label="Prescription / Advice">
                             <textarea value={draft.prescription} onChange={(event) => updateDoctorDraft(patient.queueId, "prescription", event.target.value)} rows={3} style={{ ...fieldInputCompact, minHeight: 88, resize: "vertical" }} />
                           </Field>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                            <Field label="Tests / Investigations">
+                              <textarea value={draft.tests_ordered} onChange={(event) => updateDoctorDraft(patient.queueId, "tests_ordered", event.target.value)} rows={3} style={{ ...fieldInputCompact, minHeight: 82, resize: "vertical" }} />
+                            </Field>
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <Field label="Follow-up Date">
+                                <input type="datetime-local" value={draft.follow_up_date} onChange={(event) => updateDoctorDraft(patient.queueId, "follow_up_date", event.target.value)} style={fieldInputCompact} />
+                              </Field>
+                              <Field label="Follow-up Notes">
+                                <textarea value={draft.follow_up_notes} onChange={(event) => updateDoctorDraft(patient.queueId, "follow_up_notes", event.target.value)} rows={2} style={{ ...fieldInputCompact, minHeight: 60, resize: "vertical" }} />
+                              </Field>
+                            </div>
+                          </div>
                           <Field label="Doctor Notes">
                             <textarea value={draft.doctor_notes} onChange={(event) => updateDoctorDraft(patient.queueId, "doctor_notes", event.target.value)} rows={4} style={{ ...fieldInputCompact, minHeight: 110, resize: "vertical" }} />
                           </Field>

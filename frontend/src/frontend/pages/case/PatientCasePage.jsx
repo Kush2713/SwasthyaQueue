@@ -61,6 +61,9 @@ function buildDoctorDraft(currentVisit) {
   return {
     diagnosis: currentVisit.doctor?.diagnosis || "",
     prescription: currentVisit.doctor?.prescription || "",
+    tests_ordered: currentVisit.doctor?.testsOrdered || "",
+    follow_up_date: currentVisit.doctor?.followUpDate ? String(currentVisit.doctor.followUpDate).slice(0, 16) : "",
+    follow_up_notes: currentVisit.doctor?.followUpNotes || "",
     doctor_notes: currentVisit.doctor?.notes || "",
   };
 }
@@ -78,7 +81,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
 
   const isReception = user?.role === "receptionist";
   const isNurse = user?.role === "nurse";
-  const isDoctor = user?.role === "doctor" || user?.role === "staff";
+  const isDoctor = user?.role === "doctor";
 
   async function loadCase() {
     setScreenState("loading");
@@ -328,6 +331,15 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                     <Field label="Prescription / Advice">
                       <textarea value={doctorDraft.prescription} onChange={(event) => setDoctorDraft((current) => ({ ...current, prescription: event.target.value }))} style={{ ...fieldInput, minHeight: 80, resize: "vertical" }} />
                     </Field>
+                    <Field label="Tests / Investigations">
+                      <textarea value={doctorDraft.tests_ordered} onChange={(event) => setDoctorDraft((current) => ({ ...current, tests_ordered: event.target.value }))} style={{ ...fieldInput, minHeight: 70, resize: "vertical" }} />
+                    </Field>
+                    <Field label="Follow-up Date">
+                      <input type="datetime-local" value={doctorDraft.follow_up_date} onChange={(event) => setDoctorDraft((current) => ({ ...current, follow_up_date: event.target.value }))} style={fieldInput} />
+                    </Field>
+                    <Field label="Follow-up Notes">
+                      <textarea value={doctorDraft.follow_up_notes} onChange={(event) => setDoctorDraft((current) => ({ ...current, follow_up_notes: event.target.value }))} style={{ ...fieldInput, minHeight: 70, resize: "vertical" }} />
+                    </Field>
                     <Field label="Doctor Notes">
                       <textarea value={doctorDraft.doctor_notes} onChange={(event) => setDoctorDraft((current) => ({ ...current, doctor_notes: event.target.value }))} style={{ ...fieldInput, minHeight: 96, resize: "vertical" }} />
                     </Field>
@@ -345,6 +357,9 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                     items={[
                       ["Diagnosis", caseData.currentVisit.doctor?.diagnosis || "-"],
                       ["Prescription", caseData.currentVisit.doctor?.prescription || "-"],
+                      ["Tests / Investigations", caseData.currentVisit.doctor?.testsOrdered || "-"],
+                      ["Follow-up Date", formatDateTime(caseData.currentVisit.doctor?.followUpDate)],
+                      ["Follow-up Notes", caseData.currentVisit.doctor?.followUpNotes || "-"],
                       ["Doctor Notes", caseData.currentVisit.doctor?.notes || "-"],
                       ["Consulted By", caseData.currentVisit.doctor?.consultedByName || "-"],
                       ["Consulted At", formatDateTime(caseData.currentVisit.doctor?.consultedAt)],
@@ -369,8 +384,27 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                     </div>
                     {visit.triage.notes ? <div style={{ marginTop: 4, fontSize: 13, color: "#475569" }}>Triage: {visit.triage.notes}</div> : null}
                     {visit.doctor?.diagnosis ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Diagnosis: {visit.doctor.diagnosis}</div> : null}
+                    {visit.doctor?.testsOrdered ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Tests: {visit.doctor.testsOrdered}</div> : null}
+                    {visit.doctor?.followUpDate ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Follow-up: {formatDateTime(visit.doctor.followUpDate)}</div> : null}
                   </div>
                 )) : <InlineEmpty title="No visit history yet" description="Past visits will appear here as the patient continues using the system." />}
+              </div>
+            </Card>
+
+            <Card title="Activity Timeline">
+              <div style={{ display: "grid", gap: 8 }}>
+                {caseData.eventHistory?.length ? caseData.eventHistory.map((event) => (
+                  <div key={event.eventId} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: "10px 12px", background: "#F8FAFC" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <strong style={{ color: "#0F172A" }}>{event.action}</strong>
+                      <span style={{ fontSize: 12, color: "#64748B" }}>{formatDateTime(event.createdAt)}</span>
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>
+                      {event.actorName || "System"} | {event.actorRole || "system"}
+                    </div>
+                    {event.details ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B", whiteSpace: "pre-wrap" }}>{JSON.stringify(event.details)}</div> : null}
+                  </div>
+                )) : <InlineEmpty title="No activity history yet" description="Workflow actions will appear here as the case moves through reception, triage, and consultation." />}
               </div>
             </Card>
           </>
