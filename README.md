@@ -70,7 +70,7 @@ Make sure PostgreSQL is running locally on:
 
 ### 2. Backend
 
-From [backend](D:/Study/Learning/Projects/SwasthyaQueue/backend):
+From `backend/`:
 
 ```powershell
 npm.cmd install
@@ -88,11 +88,11 @@ Quick checks:
 
 ### 3. ML Service
 
-From [ml-service](D:/Study/Learning/Projects/SwasthyaQueue/ml-service):
+From `ml-service/`:
 
 ```powershell
-C:\Users\ichir\AppData\Local\Programs\Python\Python313\python.exe -m pip install -r requirements.txt
-C:\Users\ichir\AppData\Local\Programs\Python\Python313\python.exe app.py
+python -m pip install -r requirements.txt
+python app.py
 ```
 
 Runs on:
@@ -104,11 +104,11 @@ Quick check:
 - `http://localhost:5001/`
 
 Note:
-On this machine, `python` and `py` may point to the Windows Store launcher and fail with access errors, so the direct Python path is the safest option.
+If `python` is not available on PATH on your machine, use your local Python executable path instead.
 
 ### 4. Frontend
 
-From [frontend](D:/Study/Learning/Projects/SwasthyaQueue/frontend):
+From `frontend/`:
 
 ```powershell
 npm.cmd install
@@ -136,7 +136,7 @@ Why `3001` by default:
 
 ### Backend
 
-Create a `.env` in [backend](D:/Study/Learning/Projects/SwasthyaQueue/backend) using [backend/.env.example](D:/Study/Learning/Projects/SwasthyaQueue/backend/.env.example).
+Create a `.env` in `backend/` using `backend/.env.example`.
 
 Expected values:
 
@@ -152,7 +152,7 @@ ML_SERVICE_URL=http://127.0.0.1:5001
 
 ### Frontend
 
-Create a `.env.local` in [frontend](D:/Study/Learning/Projects/SwasthyaQueue/frontend) using [frontend/.env.example](D:/Study/Learning/Projects/SwasthyaQueue/frontend/.env.example).
+Create a `.env.local` in `frontend/` using `frontend/.env.example`.
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
@@ -162,7 +162,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
 
 The local schema file is:
 
-- [backend/schema.sql](D:/Study/Learning/Projects/SwasthyaQueue/backend/schema.sql)
+- `backend/schema.sql`
 
 It creates:
 
@@ -372,7 +372,7 @@ You should also add:
 
 For a short live demo, this repo now includes:
 
-- [render.yaml](D:/Study/Learning/Projects/SwasthyaQueue/render.yaml)
+- `render.yaml`
 
 That file defines:
 
@@ -388,7 +388,7 @@ That file defines:
 3. Let Render read `render.yaml`.
 4. Approve the services and database.
 5. Deploy.
-6. Run the SQL in [backend/schema.sql](D:/Study/Learning/Projects/SwasthyaQueue/backend/schema.sql) against the Render Postgres database after it is created.
+6. Run the SQL in `backend/schema.sql` against the Render Postgres database after it is created.
 7. Open the frontend Render URL and test the full flow.
 
 ### Important note for Render free tier
@@ -444,17 +444,17 @@ For a low-traffic short demo this is usually acceptable, but it is not ideal for
 
 ## Important Files
 
-- [README.md](D:/Study/Learning/Projects/SwasthyaQueue/README.md)
-- [backend/server.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/server.js)
-- [backend/db.js](D:/Study/Learning/Projects/SwasthyaQueue/backend/db.js)
-- [backend/schema.sql](D:/Study/Learning/Projects/SwasthyaQueue/backend/schema.sql)
-- [frontend/package.json](D:/Study/Learning/Projects/SwasthyaQueue/frontend/package.json)
-- [frontend/postcss.config.mjs](D:/Study/Learning/Projects/SwasthyaQueue/frontend/postcss.config.mjs)
-- [frontend/next.config.ts](D:/Study/Learning/Projects/SwasthyaQueue/frontend/next.config.ts)
-- [frontend/scripts/dev-direct.mjs](D:/Study/Learning/Projects/SwasthyaQueue/frontend/scripts/dev-direct.mjs)
-- [frontend/src/frontend/AppRouter.jsx](D:/Study/Learning/Projects/SwasthyaQueue/frontend/src/frontend/AppRouter.jsx)
-- [ml-service/app.py](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/app.py)
-- [ml-service/requirements.txt](D:/Study/Learning/Projects/SwasthyaQueue/ml-service/requirements.txt)
+- `README.md`
+- `backend/server.js`
+- `backend/db.js`
+- `backend/schema.sql`
+- `frontend/package.json`
+- `frontend/postcss.config.mjs`
+- `frontend/next.config.ts`
+- `frontend/scripts/dev-direct.mjs`
+- `frontend/src/frontend/AppRouter.jsx`
+- `ml-service/app.py`
+- `ml-service/requirements.txt`
 
 ## Final Note
 
