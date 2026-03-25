@@ -236,7 +236,7 @@ function GovHeader() {
             SQ
           </div>
           <div>
-            <p className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold">SwasthyaQueue</p>
+            <p className="text-lg font-bold">SwasthyaQueue</p>
             <p className="text-xs text-[#A8C8FF]">National Health Authority | OPD Queue Management System</p>
           </div>
         </div>
