@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const COLORS = {
   navyDark: "#002060",
@@ -25,17 +26,64 @@ function statusLabel(status) {
   return status;
 }
 
+function validateTriageDraft(draft) {
+  const toNumber = (value) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
+
+  const temperatureC = toNumber(draft.temperature_c);
+  const pulseRate = toNumber(draft.pulse_rate);
+  const spo2 = toNumber(draft.spo2);
+  const weightKg = toNumber(draft.weight_kg);
+  const bloodPressure = String(draft.blood_pressure || "").trim();
+
+  if ([temperatureC, pulseRate, spo2, weightKg].some(Number.isNaN)) {
+    return "Vitals must be numeric values.";
+  }
+
+  if (temperatureC !== null && (temperatureC < 30 || temperatureC > 45)) {
+    return "Temperature should be between 30 and 45 C.";
+  }
+
+  if (pulseRate !== null && (pulseRate < 20 || pulseRate > 240)) {
+    return "Pulse should be between 20 and 240.";
+  }
+
+  if (spo2 !== null && (spo2 < 40 || spo2 > 100)) {
+    return "SpO2 should be between 40 and 100.";
+  }
+
+  if (weightKg !== null && (weightKg < 1 || weightKg > 400)) {
+    return "Weight should be between 1 and 400 kg.";
+  }
+
+  if (bloodPressure && !/^\d{2,3}\/\d{2,3}$/.test(bloodPressure)) {
+    return "Blood pressure should be in 120/80 format.";
+  }
+
+  return "";
+}
+
 export default function StaffDashboard({ user, onLogout }) {
+  const navigate = useNavigate();
+  const isNurse = user?.role === "nurse";
+  const isDoctor = user?.role === "doctor";
   const [patients, setPatients] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [clock, setClock] = useState(clockText());
+  const [activeTab, setActiveTab] = useState(isNurse ? "triage" : isDoctor ? "consult" : "overview");
+  const [clock, setClock] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
   const [toast, setToast] = useState("");
   const [screenState, setScreenState] = useState("loading");
   const [loadError, setLoadError] = useState("");
+  const [triageDrafts, setTriageDrafts] = useState({});
+  const [doctorDrafts, setDoctorDrafts] = useState({});
+  const [selectedTriageQueueId, setSelectedTriageQueueId] = useState(null);
+  const [selectedDoctorQueueId, setSelectedDoctorQueueId] = useState(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoadError("");
@@ -54,7 +102,9 @@ export default function StaffDashboard({ user, onLogout }) {
         queue.map((patient) => ({
           id: patient.queue_id,
           queueId: patient.queue_id,
+          appointmentId: patient.appointment_id || null,
           token: patient.token_number,
+          patientId: patient.patient_id || null,
           name: patient.name,
           age: patient.age ?? "-",
           mobile: patient.phone ?? "",
@@ -62,9 +112,27 @@ export default function StaffDashboard({ user, onLogout }) {
           departmentId: department.department_id,
           priority: normalizePriority(patient.priority_level),
           priorityLevel: patient.priority_level,
+          appointmentStatus: patient.appointment_status || "queued",
+          symptoms: patient.symptoms || "",
           waitMins: patient.estimated_wait_time ?? 0,
           status: statusLabel(patient.status),
           rawStatus: patient.status,
+          urgentReviewRequested: Boolean(patient.urgent_review_requested),
+          urgentReviewReason: patient.urgent_review_reason || "",
+          urgentReviewRequestedByName: patient.urgent_review_requested_by_name || "",
+          temperatureC: patient.temperature_c ?? "",
+          bloodPressure: patient.blood_pressure || "",
+          pulseRate: patient.pulse_rate ?? "",
+          spo2: patient.spo2 ?? "",
+          weightKg: patient.weight_kg ?? "",
+          triageNotes: patient.triage_notes || "",
+          assessedByName: patient.assessed_by_name || "",
+          assessedAt: patient.assessed_at || null,
+          diagnosis: patient.diagnosis || "",
+          prescription: patient.prescription || "",
+          doctorNotes: patient.doctor_notes || "",
+          consultedByName: patient.consulted_by_name || "",
+          consultedAt: patient.consulted_at || null,
           registeredAt: patient.created_at
             ? new Date(patient.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })
             : "--:--",
@@ -87,6 +155,7 @@ export default function StaffDashboard({ user, onLogout }) {
   }, []);
 
   useEffect(() => {
+    setClock(clockText());
     const timer = setInterval(() => setClock(clockText()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -122,7 +191,7 @@ export default function StaffDashboard({ user, onLogout }) {
   const alertsList = useMemo(
     () =>
       [...patients]
-        .filter((patient) => patient.rawStatus === "waiting")
+        .filter((patient) => patient.rawStatus === "waiting" && patient.priority !== "normal")
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
@@ -145,7 +214,126 @@ export default function StaffDashboard({ user, onLogout }) {
     ];
   }, [patients]);
 
+  const urgentReviewPatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => patient.urgentReviewRequested && patient.rawStatus === "waiting")
+        .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
+    [patients]
+  );
+
+  const triagePatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => patient.rawStatus === "waiting" || patient.rawStatus === "in-progress")
+        .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
+    [patients]
+  );
+
+  const nurseStats = useMemo(() => {
+    const waitingTriage = triagePatients.filter((patient) => patient.rawStatus === "waiting").length;
+    const assessed = triagePatients.filter((patient) => patient.assessedAt).length;
+    const urgent = urgentReviewPatients.length;
+    return { waitingTriage, assessed, urgent };
+  }, [triagePatients, urgentReviewPatients]);
+
+  useEffect(() => {
+    if (!isNurse) return;
+    if (!triagePatients.length) {
+      setSelectedTriageQueueId(null);
+      return;
+    }
+
+    if (triagePatients.some((patient) => patient.queueId === selectedTriageQueueId)) return;
+    const nextPatient = urgentReviewPatients[0] || triagePatients[0];
+    setSelectedTriageQueueId(nextPatient?.queueId || null);
+  }, [isNurse, triagePatients, urgentReviewPatients, selectedTriageQueueId]);
+
+  const selectedTriagePatient = useMemo(
+    () => triagePatients.find((patient) => patient.queueId === selectedTriageQueueId) || null,
+    [triagePatients, selectedTriageQueueId]
+  );
+
+  const doctorPatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => patient.appointmentStatus === "ready-for-doctor" || patient.rawStatus === "in-progress")
+        .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
+    [patients]
+  );
+
+  const doctorStats = useMemo(() => {
+    const ready = doctorPatients.filter((patient) => patient.appointmentStatus === "ready-for-doctor").length;
+    const inRoom = doctorPatients.filter((patient) => patient.rawStatus === "in-progress").length;
+    return { ready, inRoom };
+  }, [doctorPatients]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    if (!doctorPatients.length) {
+      setSelectedDoctorQueueId(null);
+      return;
+    }
+
+    if (doctorPatients.some((patient) => patient.queueId === selectedDoctorQueueId)) return;
+    setSelectedDoctorQueueId(doctorPatients[0].queueId);
+  }, [isDoctor, doctorPatients, selectedDoctorQueueId]);
+
+  const selectedDoctorPatient = useMemo(
+    () => doctorPatients.find((patient) => patient.queueId === selectedDoctorQueueId) || null,
+    [doctorPatients, selectedDoctorQueueId]
+  );
+
   const pushToast = (message) => setToast(message);
+
+  const getTriageDraft = useCallback(
+    (patient) => {
+      const existing = triageDrafts[patient.queueId];
+      if (existing) return existing;
+      return {
+        temperature_c: patient.temperatureC === "" ? "" : String(patient.temperatureC),
+        blood_pressure: patient.bloodPressure || "",
+        pulse_rate: patient.pulseRate === "" ? "" : String(patient.pulseRate),
+        spo2: patient.spo2 === "" ? "" : String(patient.spo2),
+        weight_kg: patient.weightKg === "" ? "" : String(patient.weightKg),
+        triage_notes: patient.triageNotes || "",
+      };
+    },
+    [triageDrafts]
+  );
+
+  const getDoctorDraft = useCallback(
+    (patient) => {
+      const existing = doctorDrafts[patient.queueId];
+      if (existing) return existing;
+      return {
+        diagnosis: patient.diagnosis || "",
+        prescription: patient.prescription || "",
+        doctor_notes: patient.doctorNotes || "",
+      };
+    },
+    [doctorDrafts]
+  );
+
+  const updateTriageDraft = useCallback((queueId, field, value) => {
+    setTriageDrafts((current) => ({
+      ...current,
+      [queueId]: {
+        ...(current[queueId] || {}),
+        [field]: value,
+      },
+    }));
+  }, []);
+
+  const updateDoctorDraft = useCallback((queueId, field, value) => {
+    setDoctorDrafts((current) => ({
+      ...current,
+      [queueId]: {
+        ...(current[queueId] || {}),
+        [field]: value,
+      },
+    }));
+  }, []);
 
   const callIn = async (departmentId) => {
     try {
@@ -166,6 +354,88 @@ export default function StaffDashboard({ user, onLogout }) {
       await loadDashboardData();
     } catch (error) {
       pushToast(error.message || "Unable to complete patient.");
+    }
+  };
+
+  const approvePriority = async (queueId, priorityLevel) => {
+    try {
+      const { overrideQueuePriority } = await import("../../lib/api");
+      const result = await overrideQueuePriority(queueId, {
+        priority_level: priorityLevel,
+        escalated_by_role: user?.role || "nurse",
+        escalated_by_name: user?.name || "Nurse",
+        note: `Approved by ${user?.designation || "nurse"} after urgent review`,
+      });
+      pushToast(result.message || "Priority updated.");
+      await loadDashboardData();
+    } catch (error) {
+      pushToast(error.message || "Unable to update priority.");
+    }
+  };
+
+  const saveTriage = async (patient) => {
+    try {
+      const { recordNurseTriage } = await import("../../lib/api");
+      const draft = getTriageDraft(patient);
+      const validationError = validateTriageDraft(draft);
+      if (validationError) {
+        pushToast(validationError);
+        return;
+      }
+      const result = await recordNurseTriage(patient.queueId, {
+        ...draft,
+        assessed_by_name: user?.name || "Triage Nurse",
+      });
+      pushToast(result.message || "Nurse assessment saved.");
+      setTriageDrafts((current) => {
+        const next = { ...current };
+        delete next[patient.queueId];
+        return next;
+      });
+      await loadDashboardData();
+    } catch (error) {
+      pushToast(error.message || "Unable to save nurse assessment.");
+    }
+  };
+
+  const markReady = async (patient) => {
+    try {
+      const { markReadyForDoctor } = await import("../../lib/api");
+      const draft = getTriageDraft(patient);
+      const validationError = validateTriageDraft(draft);
+      if (validationError) {
+        pushToast(validationError);
+        return;
+      }
+      await markReadyForDoctor(patient.queueId, {
+        ...draft,
+        assessed_by_name: user?.name || "Triage Nurse",
+      });
+      pushToast("Patient marked ready for doctor.");
+      await loadDashboardData();
+    } catch (error) {
+      pushToast(error.message || "Unable to mark patient ready for doctor.");
+    }
+  };
+
+  const saveDoctorWork = async (patient, completeVisit = false) => {
+    try {
+      const { saveDoctorUpdate } = await import("../../lib/api");
+      const draft = getDoctorDraft(patient);
+      await saveDoctorUpdate(patient.appointmentId, {
+        ...draft,
+        consulted_by_name: user?.name || "Doctor",
+        complete_visit: completeVisit,
+      });
+      pushToast(completeVisit ? "Visit completed." : "Doctor notes saved.");
+      setDoctorDrafts((current) => {
+        const next = { ...current };
+        delete next[patient.queueId];
+        return next;
+      });
+      await loadDashboardData();
+    } catch (error) {
+      pushToast(error.message || "Unable to save doctor notes.");
     }
   };
 
@@ -194,22 +464,36 @@ export default function StaffDashboard({ user, onLogout }) {
         <section style={{ background: COLORS.navy, color: "#fff", borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
-              <div style={{ color: COLORS.skyText, fontSize: 12 }}>Staff Console</div>
-              <div style={{ fontWeight: 800, fontSize: 22 }}>{user?.name || "Reception Staff"}</div>
+              <div style={{ color: COLORS.skyText, fontSize: 12 }}>{isNurse ? "Nurse Console" : isDoctor ? "Doctor Console" : "Staff Console"}</div>
+              <div style={{ fontWeight: 800, fontSize: 22 }}>{user?.name || (isNurse ? "Triage Nurse" : isDoctor ? "Consulting Doctor" : "Reception Staff")}</div>
               <div style={{ color: COLORS.skyText, fontSize: 12 }}>{clock}</div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(78px, 1fr))", gap: 8, minWidth: 320 }}>
-              <MiniStat title="Waiting" value={kpis.waiting} />
-              <MiniStat title="Critical" value={kpis.criticalWait} />
-              <MiniStat title="In Room" value={kpis.inConsult} />
-              <MiniStat title="Done" value={kpis.completed} />
-            </div>
+            {isNurse ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(92px, 1fr))", gap: 8, minWidth: 300 }}>
+                <MiniStat title="For Triage" value={nurseStats.waitingTriage} />
+                <MiniStat title="Urgent" value={nurseStats.urgent} />
+                <MiniStat title="Assessed" value={nurseStats.assessed} />
+              </div>
+            ) : isDoctor ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(92px, 1fr))", gap: 8, minWidth: 300 }}>
+                <MiniStat title="Ready" value={doctorStats.ready} />
+                <MiniStat title="In Room" value={doctorStats.inRoom} />
+                <MiniStat title="Done" value={kpis.completed} />
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(78px, 1fr))", gap: 8, minWidth: 320 }}>
+                <MiniStat title="Waiting" value={kpis.waiting} />
+                <MiniStat title="Critical" value={kpis.criticalWait} />
+                <MiniStat title="In Room" value={kpis.inConsult} />
+                <MiniStat title="Done" value={kpis.completed} />
+              </div>
+            )}
           </div>
         </section>
 
-        <TabsBar activeTab={activeTab} onChange={setActiveTab} />
+        <TabsBar activeTab={activeTab} onChange={setActiveTab} userRole={user?.role} />
 
-        {activeTab === "overview" ? (
+        {activeTab === "overview" && !isNurse ? (
           <section style={{ marginTop: 10 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 8 }}>
               <KpiCard label="Total Today" value={kpis.totalToday} color={COLORS.navy} />
@@ -227,20 +511,20 @@ export default function StaffDashboard({ user, onLogout }) {
                     {alertsList.map((patient) => (
                       <div key={patient.id} style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 9, background: "#fff" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                          <div>
-                            <div style={{ fontWeight: 800 }}>#{patient.token} | {patient.name}</div>
-                            <div style={{ fontSize: 12, color: "#64748B" }}>{patient.department} | wait {patient.waitMins} min</div>
+                            <div>
+                              <div style={{ fontWeight: 800 }}>#{patient.token} | {patient.name}</div>
+                              <div style={{ fontSize: 12, color: "#64748B" }}>{patient.department} | wait {patient.waitMins} min</div>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>Reception manages queue calling</div>
                           </div>
-                          {patient.rawStatus === "waiting" ? <button type="button" onClick={() => callIn(patient.departmentId)} style={{ border: "none", borderRadius: 7, padding: "7px 10px", background: COLORS.navy, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Call Next</button> : null}
+                          <div style={{ marginTop: 6, fontSize: 12 }}><PriorityPill priority={patient.priority} /></div>
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 12 }}><PriorityPill priority={patient.priority} /></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <InlineEmpty title="No urgent cases right now" description="Waiting patients will appear here automatically." />
-                )}
-              </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <InlineEmpty title="No high-priority alerts right now" description="Only high and critical patients appear here for the clinical team." />
+                  )}
+                </Card>
 
               <Card title="Department Load">
                 <div style={{ display: "grid", gap: 8 }}>
@@ -263,7 +547,7 @@ export default function StaffDashboard({ user, onLogout }) {
 
             <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
               <div style={{ display: "grid", gridTemplateColumns: "72px 1.8fr 1.2fr 1fr 1fr 1fr", padding: "9px 10px", fontSize: 12, fontWeight: 800, color: "#64748B", borderBottom: "1px solid #E2E8F0" }}><div>TOKEN</div><div>PATIENT</div><div>DEPARTMENT</div><div>PRIORITY</div><div>WAIT</div><div>ACTION</div></div>
-              {queueRows.length ? queueRows.map((patient) => <QueueManagerRow key={patient.id} patient={patient} onCall={() => callIn(patient.departmentId)} onComplete={() => complete(patient.queueId)} />) : <InlineEmpty title="No patients in this department" description="Try a different filter or wait for new registrations." />}
+              {queueRows.length ? queueRows.map((patient) => <QueueManagerRow key={patient.id} patient={patient} userRole={user?.role} onOpenCase={() => navigate(`/case/queue/${patient.queueId}`)} onCall={() => callIn(patient.departmentId)} onComplete={() => complete(patient.queueId)} />) : <InlineEmpty title="No patients in this department" description="Try a different filter or wait for new registrations." />}
             </section>
           </section>
         ) : null}
@@ -301,11 +585,313 @@ export default function StaffDashboard({ user, onLogout }) {
           </section>
         ) : null}
 
+        {activeTab === "triage" ? (
+          <section style={{ marginTop: 10, display: "grid", gap: 10 }}>
+            {user?.role === "nurse" ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 10, alignItems: "start" }}>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <Card title="Urgent Review" count={urgentReviewPatients.length} countColor="#DC2626">
+                      {urgentReviewPatients.length ? (
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {urgentReviewPatients.map((patient) => (
+                            <button
+                              key={patient.id}
+                              type="button"
+                              onClick={() => setSelectedTriageQueueId(patient.queueId)}
+                              style={{
+                                border: selectedTriageQueueId === patient.queueId ? `2px solid ${COLORS.navy}` : "1px solid #E2E8F0",
+                                borderRadius: 10,
+                                padding: 10,
+                                background: "#F8FAFC",
+                                display: "grid",
+                                gap: 8,
+                                textAlign: "left",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, color: "#0F172A" }}>#{patient.token} | {patient.name}</div>
+                                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{patient.department} | wait {patient.waitMins} min</div>
+                                </div>
+                                <ReviewFlagPill />
+                              </div>
+                              <div style={{ fontSize: 12, color: "#334155" }}>{patient.urgentReviewReason || "Urgent review requested by reception."}</div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <InlineEmpty title="No urgent review requests" description="Reception flags will appear here for quick nurse approval." />
+                      )}
+                    </Card>
+
+                    <Card title="Patient Queue" count={triagePatients.length}>
+                      {triagePatients.length ? (
+                        <div style={{ display: "grid", gap: 8, maxHeight: 420, overflowY: "auto" }}>
+                          {triagePatients.map((patient) => (
+                            <button
+                              key={patient.queueId}
+                              type="button"
+                              onClick={() => setSelectedTriageQueueId(patient.queueId)}
+                              style={{
+                                border: selectedTriageQueueId === patient.queueId ? `2px solid ${COLORS.navy}` : "1px solid #E2E8F0",
+                                borderRadius: 10,
+                                padding: 10,
+                                background: "#fff",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                display: "grid",
+                                gap: 6,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
+                                  <div style={{ marginTop: 2, fontSize: 12, color: "#64748B" }}>{patient.department}</div>
+                                </div>
+                                <PriorityPill priority={patient.priority} />
+                              </div>
+                              <div style={{ fontSize: 12, color: "#64748B" }}>
+                                {patient.rawStatus === "in-progress" ? "In consultation" : "Waiting"} | {patient.waitMins} min | {patient.mobile || "No phone"}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <InlineEmpty title="No patients waiting for triage" description="New quick-intake or booked patients will appear here." />
+                      )}
+                    </Card>
+                  </div>
+
+                  <Card title={selectedTriagePatient ? "Triage Workspace" : "Triage Workspace"} count={selectedTriagePatient ? selectedTriagePatient.token : undefined}>
+                    {selectedTriagePatient ? (
+                      (() => {
+                        const patient = selectedTriagePatient;
+                        const draft = getTriageDraft(patient);
+                        return (
+                          <section style={{ display: "grid", gap: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: 20, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
+                                <div style={{ marginTop: 3, fontSize: 13, color: "#64748B" }}>
+                                  {patient.department} | {patient.rawStatus === "in-progress" ? "in consultation" : "waiting"} | {patient.mobile || "No phone"}
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                <PriorityPill priority={patient.priority} />
+                                <AppointmentStatusPill status={patient.appointmentStatus} />
+                              </div>
+                            </div>
+
+                            {patient.urgentReviewRequested ? (
+                              <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: "9px 10px", fontSize: 13 }}>
+                                <strong>Urgent review:</strong> {patient.urgentReviewReason || "Reception requested immediate nurse review."}
+                              </div>
+                            ) : null}
+
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(90px, 1fr))", gap: 8 }}>
+                              <label style={fieldLabel}>
+                                <span>Temp</span>
+                                <input value={draft.temperature_c} onChange={(event) => updateTriageDraft(patient.queueId, "temperature_c", event.target.value)} placeholder="98.6" style={fieldInputCompact} />
+                              </label>
+                              <label style={fieldLabel}>
+                                <span>BP</span>
+                                <input value={draft.blood_pressure} onChange={(event) => updateTriageDraft(patient.queueId, "blood_pressure", event.target.value)} placeholder="120/80" style={fieldInputCompact} />
+                              </label>
+                              <label style={fieldLabel}>
+                                <span>Pulse</span>
+                                <input value={draft.pulse_rate} onChange={(event) => updateTriageDraft(patient.queueId, "pulse_rate", event.target.value)} placeholder="72" style={fieldInputCompact} />
+                              </label>
+                              <label style={fieldLabel}>
+                                <span>SpO2</span>
+                                <input value={draft.spo2} onChange={(event) => updateTriageDraft(patient.queueId, "spo2", event.target.value)} placeholder="98" style={fieldInputCompact} />
+                              </label>
+                              <label style={fieldLabel}>
+                                <span>Weight</span>
+                                <input value={draft.weight_kg} onChange={(event) => updateTriageDraft(patient.queueId, "weight_kg", event.target.value)} placeholder="60" style={fieldInputCompact} />
+                              </label>
+                            </div>
+
+                            <label style={fieldLabel}>
+                              <span>Triage Notes</span>
+                              <textarea value={draft.triage_notes} onChange={(event) => updateTriageDraft(patient.queueId, "triage_notes", event.target.value)} rows={4} placeholder="Brief triage summary..." style={{ ...fieldInputCompact, resize: "vertical", minHeight: 100 }} />
+                            </label>
+
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
+                              <button type="button" onClick={() => saveTriage(patient)} style={btnPrimary}>Save Triage</button>
+                              <button type="button" onClick={() => markReady(patient)} style={{ ...btnPrimary, background: COLORS.green }}>Ready For Doctor</button>
+                              {patient.urgentReviewRequested ? (
+                                <>
+                                  <button type="button" onClick={() => approvePriority(patient.queueId, 2)} style={{ ...btnPrimary, background: "#D97706" }}>Mark High</button>
+                                  <button type="button" onClick={() => approvePriority(patient.queueId, 1)} style={{ ...btnPrimary, background: "#DC2626" }}>Mark Critical</button>
+                                </>
+                              ) : null}
+                            </div>
+
+                            {patient.assessedAt ? (
+                              <div style={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>
+                                Assessed {new Date(patient.assessedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}
+                              </div>
+                            ) : null}
+                          </section>
+                        );
+                      })()
+                    ) : (
+                      <InlineEmpty title="Select a patient" description="Choose a patient from the queue or urgent review list to start triage." />
+                    )}
+                  </Card>
+                </div>
+              </>
+            ) : (
+              <section style={{ border: "1px solid #CBD5E1", background: "#fff", borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.6 }}>
+                Nurse triage is visible only to the nurse role. Reception can flag urgent review, and doctors should focus on consultation and queue movement.
+              </section>
+            )}
+          </section>
+        ) : null}
+
+        {activeTab === "consult" ? (
+          <section style={{ marginTop: 10, display: "grid", gap: 10 }}>
+            {isDoctor ? (
+              <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 10, alignItems: "start" }}>
+                <Card title="Patients For Consultation" count={doctorPatients.length}>
+                  {doctorPatients.length ? (
+                    <div style={{ display: "grid", gap: 8, maxHeight: 560, overflowY: "auto" }}>
+                      {doctorPatients.map((patient) => (
+                        <button
+                          key={patient.queueId}
+                          type="button"
+                          onClick={() => setSelectedDoctorQueueId(patient.queueId)}
+                          style={{
+                            border: selectedDoctorQueueId === patient.queueId ? `2px solid ${COLORS.navy}` : "1px solid #E2E8F0",
+                            borderRadius: 10,
+                            padding: 10,
+                            background: "#fff",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            display: "grid",
+                            gap: 6,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                            <div>
+                              <div style={{ fontWeight: 800, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
+                            <div style={{ marginTop: 2, fontSize: 12, color: "#64748B" }}>{patient.department}</div>
+                          </div>
+                          <PriorityPill priority={patient.priority} />
+                        </div>
+                          <div style={{ fontSize: 12, color: "#334155" }}>{patient.symptoms || "Consultation details available in case file."}</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <AppointmentStatusPill status={patient.appointmentStatus} />
+                            {patient.consultedAt ? <span style={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>Updated</span> : null}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <InlineEmpty title="No patients ready for doctor" description="Nurse handoff and in-room patients will appear here." />
+                  )}
+                </Card>
+
+                <Card title="Consultation Workspace" count={selectedDoctorPatient ? selectedDoctorPatient.token : undefined}>
+                  {selectedDoctorPatient ? (
+                    (() => {
+                      const patient = selectedDoctorPatient;
+                      const draft = getDoctorDraft(patient);
+                      return (
+                        <section style={{ display: "grid", gap: 10 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: 20, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
+                              <div style={{ marginTop: 3, fontSize: 13, color: "#64748B" }}>
+                                {patient.department} | {patient.rawStatus === "in-progress" ? "in consultation" : "ready for doctor"} | {patient.mobile || "No phone"}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                              <PriorityPill priority={patient.priority} />
+                              <AppointmentStatusPill status={patient.appointmentStatus} />
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(160px, 1fr))", gap: 8 }}>
+                            <InfoBox label="Symptoms" value={patient.symptoms || "See full case for details"} />
+                            <InfoBox label="Vitals" value={`${patient.temperatureC || "-"} C | BP ${patient.bloodPressure || "-"} | Pulse ${patient.pulseRate || "-"}`} />
+                            <InfoBox label="Triage Notes" value={patient.triageNotes || "No nurse note yet"} />
+                            <InfoBox label="History" value="Use Open Full Case for past consultations and profile history" />
+                          </div>
+
+                          <Field label="Diagnosis">
+                            <textarea value={draft.diagnosis} onChange={(event) => updateDoctorDraft(patient.queueId, "diagnosis", event.target.value)} rows={3} style={{ ...fieldInputCompact, minHeight: 88, resize: "vertical" }} />
+                          </Field>
+                          <Field label="Prescription / Advice">
+                            <textarea value={draft.prescription} onChange={(event) => updateDoctorDraft(patient.queueId, "prescription", event.target.value)} rows={3} style={{ ...fieldInputCompact, minHeight: 88, resize: "vertical" }} />
+                          </Field>
+                          <Field label="Doctor Notes">
+                            <textarea value={draft.doctor_notes} onChange={(event) => updateDoctorDraft(patient.queueId, "doctor_notes", event.target.value)} rows={4} style={{ ...fieldInputCompact, minHeight: 110, resize: "vertical" }} />
+                          </Field>
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
+                            <button type="button" onClick={() => saveDoctorWork(patient, false)} style={btnPrimary}>Save Notes</button>
+                            <button type="button" onClick={() => saveDoctorWork(patient, true)} style={{ ...btnPrimary, background: COLORS.green }}>Complete Visit</button>
+                          </div>
+
+                          {patient.consultedAt ? (
+                            <div style={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>
+                              Last updated {new Date(patient.consultedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}
+                            </div>
+                          ) : null}
+                        </section>
+                      );
+                    })()
+                  ) : (
+                    <InlineEmpty title="Select a patient" description="Choose a patient from the consultation list to review symptoms, triage values, past case notes, and treatment details." />
+                  )}
+                </Card>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {activeTab === "overrides" ? (
           <section style={{ marginTop: 10, display: "grid", gap: 10 }}>
-            <section style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.6 }}>
-              The current backend does not support manual priority overrides yet. This tab is intentionally read-only so the frontend matches the backend behavior.
-            </section>
+            {user?.role === "nurse" ? (
+              urgentReviewPatients.length ? (
+                <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, background: "#fff", padding: 10 }}>
+                  <h3 style={h3}>Urgent Review Requests</h3>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {urgentReviewPatients.map((patient) => (
+                      <div key={patient.id} style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                          <div>
+                            <div style={{ fontWeight: 800 }}>#{patient.token} | {patient.name}</div>
+                            <div style={{ fontSize: 12, color: "#64748B" }}>{patient.department} | requested by {patient.urgentReviewRequestedByName || "Reception"}</div>
+                          </div>
+                          <PriorityPill priority={patient.priority} />
+                        </div>
+                          <div style={{ marginTop: 6, fontSize: 13, color: "#334155" }}>{patient.urgentReviewReason}</div>
+                          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Case</button>
+                            <button type="button" onClick={() => approvePriority(patient.queueId, 2)} style={{ ...btnPrimary, background: "#D97706" }}>Approve High</button>
+                            <button type="button" onClick={() => approvePriority(patient.queueId, 1)} style={{ ...btnPrimary, background: "#DC2626" }}>Approve Critical</button>
+                            <button type="button" onClick={() => approvePriority(patient.queueId, patient.priorityLevel || 3)} style={btnGhost}>Clear Flag / Keep Order</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <section style={{ border: "1px solid #CBD5E1", background: "#fff", borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.6 }}>
+                  No urgent review requests are waiting for nurse approval right now.
+                </section>
+              )
+            ) : (
+              <section style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.6 }}>
+                Priority override is reserved for nurse review. Reception can only flag a patient for urgent review, and doctors should focus on consultation flow.
+              </section>
+            )}
           </section>
         ) : null}
 
@@ -356,23 +942,43 @@ function InlineEmpty({ title, description }) {
   return <div style={{ padding: 20, textAlign: "center", color: "#64748B" }}><div style={{ fontWeight: 800, color: "#0F172A" }}>{title}</div><div style={{ marginTop: 6, fontSize: 13 }}>{description}</div></div>;
 }
 
-function TabsBar({ activeTab, onChange }) {
+function TabsBar({ activeTab, onChange, userRole }) {
   const tabs = [
     { key: "overview", label: "Overview" },
+    { key: "consult", label: "Consultation" },
     { key: "queue", label: "Queue Manager" },
     { key: "lookup", label: "Patient Lookup" },
+    { key: "triage", label: "Triage" },
     { key: "overrides", label: "Overrides" },
     { key: "analytics", label: "Analytics" },
   ];
-  return <section style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", background: "#fff", border: "1px solid #CBD5E1", borderRadius: 999, padding: 4, gap: 2 }}>{tabs.map((tab) => <button key={tab.key} type="button" onClick={() => onChange(tab.key)} style={{ border: "none", borderRadius: 999, padding: "8px 8px", cursor: "pointer", fontWeight: 700, fontSize: 12, background: activeTab === tab.key ? COLORS.navy : "transparent", color: activeTab === tab.key ? "#fff" : "#64748B" }}>{tab.label}</button>)}</section>;
+  const visibleTabs = userRole === "nurse"
+    ? tabs.filter((tab) => ["triage", "lookup", "overrides"].includes(tab.key))
+    : userRole === "doctor"
+      ? tabs.filter((tab) => ["consult", "lookup"].includes(tab.key))
+    : tabs.filter((tab) => (tab.key === "triage" ? userRole === "nurse" : true));
+  return <section style={{ display: "grid", gridTemplateColumns: `repeat(${visibleTabs.length},1fr)`, background: "#fff", border: "1px solid #CBD5E1", borderRadius: 999, padding: 4, gap: 2 }}>{visibleTabs.map((tab) => <button key={tab.key} type="button" onClick={() => onChange(tab.key)} style={{ border: "none", borderRadius: 999, padding: "8px 8px", cursor: "pointer", fontWeight: 700, fontSize: 12, background: activeTab === tab.key ? COLORS.navy : "transparent", color: activeTab === tab.key ? "#fff" : "#64748B" }}>{tab.label}</button>)}</section>;
 }
 
 function KpiCard({ value, label, color }) { return <div style={{ background: "#fff", border: "1px solid #CBD5E1", borderRadius: 10, padding: 10 }}><div style={{ fontFamily: "monospace", fontSize: 26, fontWeight: 900, color }}>{value}</div><div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{label}</div></div>; }
 function Card({ title, count, countColor, children }) { return <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#fff" }}><div style={{ background: COLORS.navy, color: "#fff", padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><strong>{title}</strong>{typeof count === "number" ? <span style={{ background: "#fff", color: countColor || COLORS.navy, borderRadius: 999, padding: "2px 8px", fontSize: 12, fontWeight: 900 }}>{count}</span> : null}</div><div style={{ padding: 10 }}>{children}</div></section>; }
 function MiniStat({ title, value }) { return <div style={{ border: "1px solid rgba(255,255,255,.25)", borderRadius: 8, padding: "8px 9px" }}><div style={{ fontSize: 11, color: COLORS.saffron }}>{title}</div><div style={{ fontSize: 14, fontWeight: 900, color: COLORS.skyText, marginTop: 2 }}>{value}</div></div>; }
 function PriorityPill({ priority }) { const tone = priority === "critical" ? { bg: "#FEE2E2", color: "#B91C1C", label: "Critical" } : priority === "high" ? { bg: "#FEF3C7", color: "#B45309", label: "High" } : { bg: "#DCFCE7", color: "#166534", label: "Normal" }; return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>; }
-function QueueManagerRow({ patient, onCall, onComplete }) { const left = patient.priority === "critical" ? "#DC2626" : patient.priority === "high" ? "#D97706" : "transparent"; const rowBg = patient.status === "in-consultation" ? "#ECFDF5" : patient.status === "completed" ? "#F1F5F9" : "#FFFFFF"; return <div style={{ display: "grid", gridTemplateColumns: "72px 1.8fr 1.2fr 1fr 1fr 1fr", gap: 8, alignItems: "center", borderBottom: "1px solid #E2E8F0", borderLeft: `4px solid ${left}`, background: rowBg, padding: "9px 10px", fontSize: 12 }}><div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{patient.token}</div><div><div style={{ fontWeight: 700 }}>{patient.name}</div><div style={{ color: "#64748B" }}>Queue #{patient.queueId}</div></div><div>{patient.department}</div><div><PriorityPill priority={patient.priority} /></div><div>{patient.waitMins} min</div><div>{patient.rawStatus === "waiting" ? <button type="button" onClick={onCall} style={{ ...btnPrimary, padding: "6px 9px", fontSize: 12 }}>Call Next</button> : patient.rawStatus === "in-progress" ? <button type="button" onClick={onComplete} style={{ ...btnPrimary, background: COLORS.green, padding: "6px 9px", fontSize: 12 }}>Complete</button> : <span style={{ color: "#64748B", fontWeight: 700 }}>Done</span>}</div></div>; }
+function ReviewFlagPill() { return <span style={{ background: "#FEF3C7", color: "#B45309", borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>Needs Review</span>; }
+function AppointmentStatusPill({ status }) {
+  const tone = status === "ready-for-doctor"
+    ? { bg: "#DCFCE7", color: "#166534", label: "Ready" }
+    : status === "in-progress"
+      ? { bg: "#DBEAFE", color: "#1D4ED8", label: "In Room" }
+      : { bg: "#E2E8F0", color: "#475569", label: "Queued" };
+  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>;
+}
+function QueueManagerRow({ patient, userRole, onOpenCase, onCall, onComplete }) { const left = patient.priority === "critical" ? "#DC2626" : patient.priority === "high" ? "#D97706" : "transparent"; const rowBg = patient.status === "in-consultation" ? "#ECFDF5" : patient.status === "completed" ? "#F1F5F9" : "#FFFFFF"; return <div style={{ display: "grid", gridTemplateColumns: "72px 1.8fr 1.2fr 1fr 1fr 1fr", gap: 8, alignItems: "center", borderBottom: "1px solid #E2E8F0", borderLeft: `4px solid ${left}`, background: rowBg, padding: "9px 10px", fontSize: 12 }}><div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{patient.token}</div><div><div style={{ fontWeight: 700 }}>{patient.name}</div><div style={{ color: "#64748B" }}>Queue #{patient.queueId}</div></div><div>{patient.department}</div><div><PriorityPill priority={patient.priority} /></div><div>{patient.waitMins} min</div><div style={{ display: "grid", gap: 6 }}>{patient.rawStatus === "waiting" ? (userRole === "nurse" ? <span style={{ color: "#64748B", fontWeight: 700 }}>Reception Calls</span> : <button type="button" onClick={onCall} style={{ ...btnPrimary, padding: "6px 9px", fontSize: 12 }}>Call Next</button>) : patient.rawStatus === "in-progress" ? <button type="button" onClick={onComplete} style={{ ...btnPrimary, background: COLORS.green, padding: "6px 9px", fontSize: 12 }}>Complete</button> : <span style={{ color: "#64748B", fontWeight: 700 }}>Done</span>}<button type="button" onClick={onOpenCase} style={{ ...btnGhost, padding: "6px 9px", fontSize: 12 }}>Open Case</button></div></div>; }
 function InfoBox({ label, value }) { return <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, background: "#F8FAFC", padding: "8px 9px" }}><div style={{ fontSize: 11, color: "#64748B" }}>{label}</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginTop: 2 }}>{value}</div></div>; }
+function Field({ label, children }) { return <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 700, color: "#334155" }}><span>{label}</span>{children}</label>; }
+const fieldLabel = { display: "grid", gap: 5, fontSize: 12, fontWeight: 700, color: "#334155" };
+const fieldInput = { border: "1px solid #CBD5E1", borderRadius: 8, padding: "9px 10px", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+const fieldInputCompact = { ...fieldInput, padding: "8px 9px", fontSize: 12 };
 function TricolorStrip() { return <div style={{ display: "flex", height: 5 }}><div style={{ flex: 1, background: COLORS.saffron }} /><div style={{ flex: 1, background: "#fff" }} /><div style={{ flex: 1, background: COLORS.green }} /></div>; }
 function GovHeader({ name, clock }) { return <header style={{ background: COLORS.navyDark, color: "#fff", padding: "10px 12px" }}><div style={{ maxWidth: 960, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>SQ</div><div><div style={{ fontWeight: 800, fontSize: 18 }}>SwasthyaQueue</div><div style={{ color: COLORS.skyText, fontSize: 12 }}>Staff Console | Current Backend API</div></div></div><div style={{ fontSize: 12, color: COLORS.skyText, fontWeight: 700 }}>{name} | {clock}</div></div></header>; }
 function GovFooter() { return <footer style={{ background: COLORS.navyDark, color: COLORS.skyText, fontSize: 12, padding: "10px 12px" }}><div style={{ maxWidth: 960, margin: "0 auto", textAlign: "center" }}>Copyright 2026 SwasthyaQueue | Government Hospital OPD Digital Queue System</div></footer>; }
