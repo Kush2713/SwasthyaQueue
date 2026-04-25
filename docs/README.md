@@ -35,6 +35,17 @@ It includes:
 - why queue visibility and digitization matter in each case
 - intent and impact for live demo explanation
 
+### [MANUAL_CASE_RUNBOOK.md](MANUAL_CASE_RUNBOOK.md)
+
+Use this when you want deterministic manual demo execution.
+
+It includes:
+
+- department-wise case seeds and expected outcomes
+- step-by-step reception to doctor walkthrough
+- triage validation notes (including Fahrenheit vitals)
+- quick verification checklist for live presentation runs
+
 ### [FLOW_DIAGRAMS.md](FLOW_DIAGRAMS.md)
 
 Use this when you want quick visual explanation.
@@ -57,9 +68,10 @@ If you are new to the project:
 2. [FLOW_DIAGRAMS.md](FLOW_DIAGRAMS.md)
 3. [WORKFLOWS.md](WORKFLOWS.md)
 4. [DEMO_CASE_STUDIES.md](DEMO_CASE_STUDIES.md)
-5. [Backend README](../backend/README.md)
-6. [Frontend README](../frontend/README.md)
-7. [ML Service README](../ml-service/README.md)
+5. [MANUAL_CASE_RUNBOOK.md](MANUAL_CASE_RUNBOOK.md)
+6. [Backend README](../backend/README.md)
+7. [Frontend README](../frontend/README.md)
+8. [ML Service README](../ml-service/README.md)
 
 ## Documentation Purpose
 

@@ -25,6 +25,9 @@ Examples:
 - ready-for-doctor handoff
 - doctor consultation updates
 - visit completion
+- day-wise and department-wise token generation with formatted labels
+- fixed hospital-timezone operational day logic
+- stale queue cleanup for previous-day pending entries
 
 Frontend should not directly manage queue logic. The backend is the source of workflow truth.
 
@@ -63,6 +66,8 @@ Frontend should not directly manage queue logic. The backend is the source of wo
 - record triage
 - mark ready for doctor
 - queue stats and per-department queue
+- token label formatting (`DEPT-YYYY-MM-DD-###`)
+- stale queue auto-closure housekeeping
 
 ## Important Files
 
@@ -153,6 +158,10 @@ DB_NAME=swasthyaqueue
 PORT=5000
 ML_SERVICE_URL=http://127.0.0.1:5001
 OTP_PREVIEW_ENABLED=true
+AUTH_TOKEN_SECRET=change_this_to_a_long_random_secret
+HOSPITAL_TIMEZONE=Asia/Kolkata
+QUEUE_HOUSEKEEPING_ENABLED=true
+QUEUE_HOUSEKEEPING_INTERVAL_MINUTES=15
 ```
 
 Hosted setups can use:
@@ -246,6 +255,8 @@ Hosted setups can use:
 
 - quick intake is intentionally fast and minimal
 - queue priority is still controlled by backend rules, not free-form frontend ordering
+- token numbers are unique per department per operational day (not globally unique forever)
+- patient lookup prioritizes patient ID/mobile before token-only fallback
 - frontend validation exists for better UX, but backend validates again for safety
 - `OTP_PREVIEW_ENABLED` is only for demo/local testing and should be disabled in production-like use
 

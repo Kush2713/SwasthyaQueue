@@ -45,6 +45,7 @@ SwasthyaQueue aims to improve that by giving:
 - patient visit cancellation
 - receptionist dashboard
 - patient search by token, name, or mobile
+- patient lookup ranking by patient ID/mobile before token-only fallback
 - receptionist queue calling
 - quick intake for rush cases
 - staff-assisted patient accounts for walk-ins / no-phone patients
@@ -56,6 +57,9 @@ SwasthyaQueue aims to improve that by giving:
 - doctor diagnosis / prescription / notes / completion
 - shared patient case page
 - display screen / lobby queue board
+- department + day scoped tokening with formatted labels (`GEN-YYYY-MM-DD-###`)
+- fixed hospital-timezone operational day logic (`Asia/Kolkata` by default)
+- stale queue auto-closure housekeeping job
 - backend + PostgreSQL integration
 - backend + ML integration
 - local development support
@@ -159,6 +163,7 @@ Useful docs added in this repo:
 - [docs/FLOW_DIAGRAMS.md](docs/FLOW_DIAGRAMS.md)
 - [docs/WORKFLOWS.md](docs/WORKFLOWS.md)
 - [docs/DEMO_CASE_STUDIES.md](docs/DEMO_CASE_STUDIES.md)
+- [docs/MANUAL_CASE_RUNBOOK.md](docs/MANUAL_CASE_RUNBOOK.md)
 
 ## Local Setup
 
@@ -237,6 +242,10 @@ DB_NAME=swasthyaqueue
 PORT=5000
 ML_SERVICE_URL=http://127.0.0.1:5001
 OTP_PREVIEW_ENABLED=true
+AUTH_TOKEN_SECRET=change_this_to_a_long_random_secret
+HOSPITAL_TIMEZONE=Asia/Kolkata
+QUEUE_HOUSEKEEPING_ENABLED=true
+QUEUE_HOUSEKEEPING_INTERVAL_MINUTES=15
 ```
 
 ### Frontend
