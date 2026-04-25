@@ -7,6 +7,7 @@ const patientRoutes = require("./routes/patientRoutes");
 const authRoutes = require("./routes/authRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const { ensureSchema } = require("./bootstrap/ensureSchema");
+const { closeStaleQueueEntries } = require("./jobs/queueHousekeeping");
 require("dotenv").config();
 
 const app = express();
@@ -44,9 +45,35 @@ app.get("/test-db", async (req, res) => {
 
 // Server Start (LAST)
 const PORT = process.env.PORT || 5000;
+const QUEUE_HOUSEKEEPING_ENABLED = process.env.QUEUE_HOUSEKEEPING_ENABLED !== "false";
+const QUEUE_HOUSEKEEPING_INTERVAL_MINUTES = Number(process.env.QUEUE_HOUSEKEEPING_INTERVAL_MINUTES || 15);
+
+let housekeepingRunning = false;
+
+async function runQueueHousekeeping() {
+  if (!QUEUE_HOUSEKEEPING_ENABLED || housekeepingRunning) return;
+  housekeepingRunning = true;
+  try {
+    const result = await closeStaleQueueEntries(pool);
+    if (result.closedQueueEntries > 0 || result.closedAppointments > 0) {
+      console.log(
+        `Queue housekeeping closed ${result.closedQueueEntries} queue entries and ${result.closedAppointments} appointments.`
+      );
+    }
+  } catch (error) {
+    console.error("Queue housekeeping failed", error);
+  } finally {
+    housekeepingRunning = false;
+  }
+}
 
 ensureSchema()
   .then(() => {
+    runQueueHousekeeping();
+    if (QUEUE_HOUSEKEEPING_ENABLED) {
+      setInterval(runQueueHousekeeping, QUEUE_HOUSEKEEPING_INTERVAL_MINUTES * 60 * 1000);
+    }
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

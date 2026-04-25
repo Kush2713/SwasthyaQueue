@@ -6,8 +6,24 @@ const {
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { isValidIndianMobile } = require("../utils/auth");
+const { formatTokenLabel } = require("../utils/token");
+
+function parseAge(value) {
+  if (!Number.isFinite(Number(value))) return null;
+  const age = Number(value);
+  if (!Number.isInteger(age) || age < 0 || age > 120) return null;
+  return age;
+}
 
 function mapAppointmentRow(row) {
+  const tokenDate = row.token_date || null;
+  const tokenLabel = formatTokenLabel({
+    departmentName: row.department_name,
+    tokenDate,
+    tokenNumber: row.token_number,
+  });
+
   return {
     appointmentId: row.appointment_id,
     patientId: row.patient_id,
@@ -21,9 +37,12 @@ function mapAppointmentRow(row) {
     updatedAt: row.updated_at,
     queueId: row.queue_id,
     token: row.token_number,
+    tokenDate,
+    tokenLabel,
     priorityLevel: row.priority_level,
     queueStatus: row.queue_status,
     triage: {
+      temperatureF: row.temperature_c,
       temperatureC: row.temperature_c,
       bloodPressure: row.blood_pressure,
       pulseRate: row.pulse_rate,
@@ -70,7 +89,8 @@ function normalizePreferredSlot(preferredSlot) {
 function normalizeOptionalPhone(value) {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return null;
-  return digits.slice(-10);
+  const normalized = digits.startsWith("91") && digits.length > 10 ? digits.slice(-10) : digits.slice(0, 10);
+  return isValidIndianMobile(normalized) ? normalized : null;
 }
 
 async function getAppointmentDetails(db, appointmentId) {
@@ -81,6 +101,7 @@ async function getAppointmentDetails(db, appointmentId) {
         d.name AS department_name,
         q.queue_id,
         q.token_number,
+        q.token_date,
         q.priority_level,
         q.status AS queue_status
       FROM appointments a
@@ -103,6 +124,7 @@ async function getCasePayload(db, queueId) {
         q.department_id,
         q.priority_level,
         q.token_number,
+        q.token_date,
         q.status AS queue_status,
         q.created_at AS queued_at,
         q.urgent_review_requested,
@@ -187,6 +209,7 @@ async function getCasePayload(db, queueId) {
         a.created_at,
         q.queue_id,
         q.token_number,
+        q.token_date,
         q.priority_level,
         q.status AS queue_status
       FROM appointments a
@@ -243,6 +266,12 @@ async function getCasePayload(db, queueId) {
       departmentId: current.department_id,
       department: current.department_name,
       token: current.token_number,
+      tokenDate: current.token_date,
+      tokenLabel: formatTokenLabel({
+        departmentName: current.department_name,
+        tokenDate: current.token_date,
+        tokenNumber: current.token_number,
+      }),
       priorityLevel: current.priority_level,
       queueStatus: current.queue_status,
       appointmentStatus: current.appointment_status,
@@ -259,6 +288,7 @@ async function getCasePayload(db, queueId) {
       escalatedByName: current.escalated_by_name,
       escalationNote: current.escalation_note,
       triage: {
+        temperatureF: current.temperature_c,
         temperatureC: current.temperature_c,
         bloodPressure: current.blood_pressure,
         pulseRate: current.pulse_rate,
@@ -283,6 +313,12 @@ async function getCasePayload(db, queueId) {
       appointmentId: row.appointment_id,
       queueId: row.queue_id,
       token: row.token_number,
+      tokenDate: row.token_date,
+      tokenLabel: formatTokenLabel({
+        departmentName: row.department_name,
+        tokenDate: row.token_date,
+        tokenNumber: row.token_number,
+      }),
       departmentId: row.department_id,
       department: row.department_name,
       symptoms: row.symptoms,
@@ -293,6 +329,7 @@ async function getCasePayload(db, queueId) {
       priorityLevel: row.priority_level,
       createdAt: row.created_at,
       triage: {
+        temperatureF: row.temperature_c,
         temperatureC: row.temperature_c,
         bloodPressure: row.blood_pressure,
         pulseRate: row.pulse_rate,
@@ -625,6 +662,14 @@ async function createQuickIntake(req, res) {
     return res.status(400).json({ error: "Patient name and department are required for quick intake." });
   }
 
+  const parsedAge = parseAge(age);
+  if (parsedAge === null) {
+    return res.status(400).json({ error: "Please enter a valid age between 0 and 120 for quick intake." });
+  }
+
+  const rawMobile = String(mobile || "").trim();
+  const rawEmergency = String(emergency_contact || "").trim();
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -646,6 +691,16 @@ async function createQuickIntake(req, res) {
     const normalizedMobile = normalizeOptionalPhone(mobile);
     const normalizedEmergency = normalizeOptionalPhone(emergency_contact);
 
+    if (rawMobile && !normalizedMobile) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Mobile must be a valid 10-digit Indian mobile number." });
+    }
+
+    if (rawEmergency && !normalizedEmergency) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Emergency contact must be a valid 10-digit Indian mobile number." });
+    }
+
     const patientResult = await client.query(
       `
         INSERT INTO patients (name, age, gender, phone, address, emergency_contact)
@@ -654,7 +709,7 @@ async function createQuickIntake(req, res) {
       `,
       [
         name.trim(),
-        Number(age) || 0,
+        parsedAge,
         gender || null,
         normalizedMobile,
         address?.trim() || null,
@@ -780,6 +835,7 @@ async function getMyActiveAppointment(req, res) {
           d.name AS department_name,
           q.queue_id,
           q.token_number,
+          q.token_date,
           q.priority_level,
           q.status AS queue_status
         FROM appointments a
@@ -829,6 +885,7 @@ async function getMyAppointmentHistory(req, res) {
           d.name AS department_name,
           q.queue_id,
           q.token_number,
+          q.token_date,
           q.priority_level,
           q.status AS queue_status
         FROM appointments a

@@ -43,6 +43,12 @@ export function normalizePriority(priorityLevel) {
   return "normal";
 }
 
+export function formatTokenDisplay(tokenLabel, tokenNumber) {
+  if (tokenLabel) return tokenLabel;
+  if (tokenNumber === null || tokenNumber === undefined || tokenNumber === "") return "-";
+  return `#${tokenNumber}`;
+}
+
 export function getDepartmentIdByName(name) {
   return DEPARTMENT_NAME_TO_ID[name] || 1;
 }
@@ -157,6 +163,11 @@ export function updatePatientProfileById(patientId, payload) {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function lookupPatients(queryText) {
+  const query = String(queryText || "").trim();
+  return request(`/api/patients/lookup?q=${encodeURIComponent(query)}`);
 }
 
 export function saveDoctorUpdate(appointmentId, payload) {

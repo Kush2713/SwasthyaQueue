@@ -110,6 +110,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
     if (!activeAppointment) return null;
     return {
       token: activeAppointment.token || "-",
+      tokenLabel: activeAppointment.tokenLabel || null,
       department: activeAppointment.department || "-",
       position: activeAppointment.position || "-",
       estimatedWait: activeAppointment.estimatedWait == null ? "-" : `${activeAppointment.estimatedWait} min`,
@@ -181,7 +182,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
             {activeCard ? (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(120px,1fr))", gap: 10 }}>
-                  <InfoCell label="Token" value={`#${activeCard.token}`} emphasis />
+                  <InfoCell label="Token" value={activeCard.tokenLabel || `#${activeCard.token}`} emphasis />
                   <InfoCell label="Department" value={activeCard.department} />
                   <InfoCell label="Position" value={activeCard.position} />
                   <InfoCell label="Estimated Wait" value={activeCard.estimatedWait} />
@@ -243,7 +244,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
                       <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{formatDateTime(appointment.createdAt)}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: "monospace", fontWeight: 900, color: "#003580" }}>#{appointment.token || "-"}</div>
+                      <div style={{ fontFamily: "monospace", fontWeight: 900, color: "#003580" }}>{appointment.tokenLabel || `#${appointment.token || "-"}`}</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>{queueStatusLabel(appointment.queueStatus || appointment.status)}</div>
                     </div>
                   </div>
