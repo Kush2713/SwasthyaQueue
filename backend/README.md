@@ -133,6 +133,12 @@ npm.cmd install
 npm.cmd start
 ```
 
+Reset demo data quickly:
+
+```powershell
+npm.cmd run demo:reset
+```
+
 Default local URL:
 
 - `http://localhost:5000`

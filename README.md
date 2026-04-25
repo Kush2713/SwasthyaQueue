@@ -404,6 +404,20 @@ Current short-term hosting path:
 4. Deploy services.
 5. Run `backend/schema.sql` against the hosted database.
 
+### Render environment checklist
+
+Set these explicitly in Render service environment variables:
+
+- `OTP_PREVIEW_ENABLED=true` (demo-only; disable for production)
+- `ML_SERVICE_URL=<your hosted ML service URL>`
+- `HOSPITAL_TIMEZONE=Asia/Kolkata`
+- `QUEUE_HOUSEKEEPING_ENABLED=true`
+- `AUTH_TOKEN_SECRET=<long random secret>`
+
+Important:
+
+- Do not leave `ML_SERVICE_URL` pointing to `localhost` in Render.
+
 ## Future Development
 
 ### ABHA / Digital Health Integration
