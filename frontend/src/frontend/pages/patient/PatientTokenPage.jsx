@@ -15,7 +15,7 @@ function formatIndianMobile(value = "") {
   return `+91 ${normalized.slice(0, 5)} ${normalized.slice(5)}`;
 }
 
-export default function PatientTokenPage({ tokenData, onBack, onProceed }) {
+export default function PatientTokenPage({ tokenData, onProceed }) {
   if (!tokenData) return null;
 
   return (
@@ -30,7 +30,7 @@ export default function PatientTokenPage({ tokenData, onBack, onProceed }) {
               <div style={{ color: COLORS.skyText, fontSize: 12 }}>Token generated successfully</div>
             </div>
             <div style={{ background: COLORS.saffron, color: "#4A2500", borderRadius: 999, padding: "5px 12px", fontFamily: "monospace", fontWeight: 900 }}>
-              #{tokenData.token}
+              {tokenData.tokenLabel || `#${tokenData.token}`}
             </div>
           </div>
 
@@ -71,7 +71,6 @@ function Info({ label, value }) {
 }
 
 const btnPrimary = { border: "none", borderRadius: 8, background: COLORS.navy, color: "#fff", fontWeight: 700, padding: "10px 14px", cursor: "pointer" };
-const btnGhost = { border: "1px solid #CBD5E1", borderRadius: 8, background: "#fff", color: "#334155", fontWeight: 700, padding: "10px 14px", cursor: "pointer" };
 
 function TricolorStrip() {
   return <div style={{ display: "flex", height: 5 }}><div style={{ flex: 1, background: COLORS.saffron }} /><div style={{ flex: 1, background: "#fff" }} /><div style={{ flex: 1, background: COLORS.green }} /></div>;
