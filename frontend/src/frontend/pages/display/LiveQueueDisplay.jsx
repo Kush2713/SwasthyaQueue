@@ -133,6 +133,17 @@ export default function LiveQueueDisplay() {
   useEffect(() => {
     setScreenState("loading");
     loadDisplayData();
+    const interval = setInterval(() => {
+      loadDisplayData();
+    }, 10000);
+    const onFocus = () => {
+      loadDisplayData();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [loadDisplayData]);
 
   useEffect(() => {
@@ -148,14 +159,6 @@ export default function LiveQueueDisplay() {
     }, 6000);
     return () => clearInterval(id);
   }, [screenState]);
-
-  useEffect(() => {
-    if (screenState !== "ready") return;
-    const id = setInterval(() => {
-      loadDisplayData();
-    }, 10000);
-    return () => clearInterval(id);
-  }, [screenState, loadDisplayData]);
 
   if (screenState === "loading") {
     return <DisplayShell clock={clock} livePulse={livePulse}><DisplayStateCard title="Loading live queue" description="Fetching department queue data from the backend." /></DisplayShell>;
