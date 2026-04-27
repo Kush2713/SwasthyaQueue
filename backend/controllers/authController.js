@@ -8,7 +8,6 @@ const {
   normalizeEmail,
   normalizeIdentifier,
   normalizeMobile,
-  isValidIndianMobile,
 } = require("../utils/auth");
 const { getStaffUserByCredentials, getStaffUserById, sanitizeStaffUser } = require("../utils/staffUsers");
 const { logWorkflowEvent } = require("../utils/audit");
@@ -38,7 +37,7 @@ function validateSignup(body) {
     return "Please enter a valid age.";
   }
   if (!body.gender?.trim()) return "Gender is required.";
-  if (!isValidIndianMobile(body.mobile)) return "Please enter a valid 10-digit Indian mobile number.";
+  if (!normalizeMobile(body.mobile)) return "A valid mobile number is required.";
   return "";
 }
 
@@ -165,10 +164,6 @@ async function createAssistedPatientAccount(req, res) {
 
   const mobile = req.body.mobile ? normalizeMobile(req.body.mobile) : null;
   const email = req.body.email ? normalizeEmail(req.body.email) : null;
-
-  if (req.body.mobile && !isValidIndianMobile(req.body.mobile)) {
-    return res.status(400).json({ error: "Please enter a valid 10-digit Indian mobile number." });
-  }
 
   const client = await pool.connect();
   try {

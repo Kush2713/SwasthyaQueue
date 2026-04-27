@@ -48,7 +48,7 @@ function buildProfileDraft(patient) {
 
 function buildTriageDraft(currentVisit) {
   return {
-    temperature_c: currentVisit.triage.temperatureF ?? currentVisit.triage.temperatureC ?? "",
+    temperature_c: currentVisit.triage.temperatureC ?? "",
     blood_pressure: currentVisit.triage.bloodPressure || "",
     pulse_rate: currentVisit.triage.pulseRate ?? "",
     spo2: currentVisit.triage.spo2 ?? "",
@@ -113,7 +113,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
       const { updatePatientProfileById } = await import("../../lib/api");
       await updatePatientProfileById(caseData.patient.patientId, {
         ...profileDraft,
-        age: Number(profileDraft.age),
+        age: Number(profileDraft.age) || 0,
         mobile: normalizePhone(profileDraft.mobile) || null,
         emergencyContact: normalizePhone(profileDraft.emergencyContact) || null,
       });
@@ -187,7 +187,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                   <div style={{ color: COLORS.skyText, fontSize: 12 }}>Patient Case</div>
                   <div style={{ fontSize: 24, fontWeight: 800 }}>{caseData.patient.name}</div>
                   <div style={{ color: COLORS.skyText, fontSize: 12 }}>
-                    Patient ID {caseData.patient.patientId} | Token {caseData.currentVisit.tokenLabel || `#${caseData.currentVisit.token}`} | {caseData.currentVisit.department}
+                    Patient ID {caseData.patient.patientId} | Token #{caseData.currentVisit.token} | {caseData.currentVisit.department}
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(100px, 1fr))", gap: 8, minWidth: 320 }}>
@@ -279,7 +279,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                     {triageState.error ? <Notice tone="warn" text={triageState.error} /> : null}
                     {triageState.message ? <Notice tone="info" text={triageState.message} /> : null}
                     <FormGrid>
-                      <Field label="Temperature (F)">
+                      <Field label="Temperature (C)">
                         <input value={triageDraft.temperature_c} onChange={(event) => setTriageDraft((current) => ({ ...current, temperature_c: event.target.value }))} style={fieldInput} />
                       </Field>
                       <Field label="Blood Pressure">
@@ -307,7 +307,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                 ) : (
                   <DetailGrid
                     items={[
-                      ["Temperature", (caseData.currentVisit.triage.temperatureF ?? caseData.currentVisit.triage.temperatureC) ? `${caseData.currentVisit.triage.temperatureF ?? caseData.currentVisit.triage.temperatureC} F` : "-"],
+                      ["Temperature", caseData.currentVisit.triage.temperatureC ? `${caseData.currentVisit.triage.temperatureC} C` : "-"],
                       ["Blood Pressure", caseData.currentVisit.triage.bloodPressure || "-"],
                       ["Pulse", caseData.currentVisit.triage.pulseRate || "-"],
                       ["SpO2", caseData.currentVisit.triage.spo2 || "-"],
@@ -375,7 +375,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                   <div key={visit.appointmentId} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 10, background: "#fff" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                       <div style={{ fontWeight: 800 }}>
-                        {visit.department} {visit.token ? `| Token ${visit.tokenLabel || `#${visit.token}`}` : ""}
+                        {visit.department} {visit.token ? `| Token #${visit.token}` : ""}
                       </div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>{formatDateTime(visit.createdAt)}</div>
                     </div>

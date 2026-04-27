@@ -4,7 +4,6 @@ const {
   issueAuthToken,
   verifyAuthToken,
   normalizeMobile,
-  isValidIndianMobile,
   normalizeIdentifier,
 } = require("../utils/auth");
 const {
@@ -77,8 +76,6 @@ async function main() {
 
   await run("normalizers support Indian mobile and email identifiers", () => {
     assert.equal(normalizeMobile("+91 98765 43210"), "9876543210");
-    assert.equal(isValidIndianMobile("9876543210"), true);
-    assert.equal(isValidIndianMobile("1234567890"), false);
     assert.deepEqual(normalizeIdentifier("9876543210"), {
       type: "mobile",
       value: "9876543210",

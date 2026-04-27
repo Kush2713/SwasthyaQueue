@@ -90,7 +90,6 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE queue
     ADD COLUMN IF NOT EXISTS appointment_id INTEGER UNIQUE REFERENCES appointments(appointment_id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS token_date DATE,
     ADD COLUMN IF NOT EXISTS urgent_review_requested BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS urgent_review_reason TEXT,
     ADD COLUMN IF NOT EXISTS urgent_review_requested_by_role VARCHAR(30),
@@ -100,22 +99,6 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS escalated_by_role VARCHAR(30),
     ADD COLUMN IF NOT EXISTS escalated_by_name VARCHAR(120),
     ADD COLUMN IF NOT EXISTS escalation_note TEXT
-  `);
-
-  await pool.query(`
-    UPDATE queue
-    SET token_date = (created_at AT TIME ZONE 'Asia/Kolkata')::date
-    WHERE token_date IS NULL
-  `);
-
-  await pool.query(`
-    ALTER TABLE queue
-    ALTER COLUMN token_date SET NOT NULL
-  `);
-
-  await pool.query(`
-    ALTER TABLE queue
-    ALTER COLUMN token_date SET DEFAULT ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)
   `);
 
   await pool.query(`
@@ -149,11 +132,6 @@ async function ensureSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_workflow_events_appointment_created
     ON workflow_events (appointment_id, created_at DESC)
-  `);
-
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_department_day_token
-    ON queue (department_id, token_date, token_number)
   `);
 
     await pool.query(`

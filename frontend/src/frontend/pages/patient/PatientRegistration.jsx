@@ -272,7 +272,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
 
       const payload = {
         token: appointment?.token,
-        tokenLabel: appointment?.tokenLabel || null,
         queueId: appointment?.queueId,
         appointmentId: appointment?.appointmentId,
         patientId: user?.patientId,
@@ -567,7 +566,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
             <FormCard title="Registration Successful" subtitle="Token generated">
               <div style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ background: COLORS.navy, color: "#fff", padding: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{success.department}</strong><span style={{ background: COLORS.saffron, color: "#4A2500", borderRadius: 999, padding: "4px 10px", fontWeight: 800 }}>{success.tokenLabel || `#${success.token}`}</span>
+                  <strong>{success.department}</strong><span style={{ background: COLORS.saffron, color: "#4A2500", borderRadius: 999, padding: "4px 10px", fontWeight: 800 }}>#{success.token}</span>
                 </div>
                 <div style={{ padding: 12 }}>
                   <div style={{ fontSize: 22, fontWeight: 800 }}>{form.name}</div>

@@ -76,7 +76,6 @@ CREATE TABLE IF NOT EXISTS queue (
   department_id INTEGER NOT NULL REFERENCES departments(department_id) ON DELETE CASCADE,
   priority_level INTEGER NOT NULL CHECK (priority_level BETWEEN 1 AND 3),
   token_number INTEGER NOT NULL,
-  token_date DATE NOT NULL DEFAULT ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date),
   status VARCHAR(20) NOT NULL DEFAULT 'waiting',
   urgent_review_requested BOOLEAN NOT NULL DEFAULT FALSE,
   urgent_review_reason TEXT,
@@ -114,9 +113,6 @@ CREATE INDEX IF NOT EXISTS idx_queue_status
 
 CREATE INDEX IF NOT EXISTS idx_queue_priority_token
   ON queue (priority_level, token_number);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_department_day_token
-  ON queue (department_id, token_date, token_number);
 
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_created
   ON appointments (patient_id, created_at DESC);

@@ -74,11 +74,6 @@ function normalizeMobile(value = "") {
   return digits.slice(0, 10);
 }
 
-function isValidIndianMobile(value = "") {
-  const normalized = normalizeMobile(value);
-  return /^[6-9]\d{9}$/.test(normalized);
-}
-
 function normalizeEmail(value = "") {
   return String(value).trim().toLowerCase();
 }
@@ -111,7 +106,6 @@ module.exports = {
   issueAuthToken,
   verifyAuthToken,
   normalizeMobile,
-  isValidIndianMobile,
   normalizeEmail,
   normalizeIdentifier,
   generateOtpCode,

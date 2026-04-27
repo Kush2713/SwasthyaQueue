@@ -68,7 +68,6 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const [queueRows, setQueueRows] = useState([]);
   const [query, setQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
-  const [lookupMatches, setLookupMatches] = useState([]);
   const [activeDepartment, setActiveDepartment] = useState("All");
   const [urgentForm, setUrgentForm] = useState({ queueId: null, reason: "" });
   const [assistedForm, setAssistedForm] = useState({
@@ -110,7 +109,6 @@ export default function ReceptionDashboard({ user, onLogout }) {
           id: patient.queue_id,
           queueId: patient.queue_id,
           token: patient.token_number,
-          tokenLabel: patient.token_label || null,
           patientId: patient.patient_id,
           name: patient.name,
           age: patient.age ?? "-",
@@ -135,7 +133,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
         const rows = flattenedQueue.filter((patient) => patient.departmentId === department.department_id);
         const waiting = rows.filter((patient) => patient.rawStatus === "waiting").length;
         const active = rows.find((patient) => patient.rawStatus === "in-progress");
-        const nowServing = active?.tokenLabel || (active?.token ? `#${active.token}` : null) || rows[0]?.tokenLabel || (rows[0]?.token ? `#${rows[0].token}` : "-");
+        const nowServing = active?.token || rows[0]?.token || "-";
         const etaForNewToken = waiting * department.avg_consult_time;
         return {
           ...department,
@@ -193,52 +191,22 @@ export default function ReceptionDashboard({ user, onLogout }) {
     return queueRows.filter((row) => row.department === activeDepartment);
   }, [queueRows, activeDepartment]);
 
-  const runLookup = async () => {
+  const runLookup = () => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
       setLookupResult(null);
-      setLookupMatches([]);
       return;
     }
 
-    try {
-      const { lookupPatients, normalizePriority } = await import("../../lib/api");
-      const response = await lookupPatients(normalizedQuery);
-      const mappedMatches = (response?.patients || []).map((patient) => {
-        const latestVisit = patient.latestVisit || null;
-        const activeQueueRow = latestVisit?.queueId
-          ? queueRows.find((row) => row.queueId === latestVisit.queueId)
-          : null;
+    const numericToken = Number(normalizedQuery);
+    const normalizedMobileQuery = normalizeMobile(normalizedQuery);
+    const found = queueRows.find((row) =>
+      row.token === numericToken ||
+      row.name?.toLowerCase().includes(normalizedQuery) ||
+      normalizeMobile(row.mobile).includes(normalizedMobileQuery)
+    );
 
-        return {
-          queueId: latestVisit?.queueId || null,
-          token: latestVisit?.token || "-",
-          tokenLabel: latestVisit?.tokenLabel || null,
-          patientId: patient.patientId,
-          name: patient.name,
-          age: patient.age ?? "-",
-          mobile: patient.mobile ?? "",
-          department: latestVisit?.department || "-",
-          departmentId: latestVisit?.departmentId || null,
-          priority: activeQueueRow ? activeQueueRow.priority : normalizePriority(latestVisit?.priorityLevel || 3),
-          priorityLevel: latestVisit?.priorityLevel || null,
-          waitMins: activeQueueRow?.waitMins ?? 0,
-          peopleAhead: activeQueueRow?.peopleAhead ?? 0,
-          status: activeQueueRow?.status || normalizeStatus(latestVisit?.queueStatus || latestVisit?.appointmentStatus || "No Active Queue"),
-          rawStatus: activeQueueRow?.rawStatus || latestVisit?.queueStatus || "",
-          registeredAt: latestVisit?.createdAt ? formatDateTime(latestVisit.createdAt) : "-",
-          preferredSlot: latestVisit?.preferredSlot ? formatDateTime(latestVisit.preferredSlot) : "-",
-          hasActiveQueue: Boolean(patient.hasActiveQueue),
-        };
-      });
-
-      setLookupMatches(mappedMatches);
-      setLookupResult(mappedMatches[0] || null);
-    } catch (err) {
-      setLoadError(err.message || "Unable to search patients right now.");
-      setLookupMatches([]);
-      setLookupResult(null);
-    }
+    setLookupResult(found || null);
   };
 
   const submitUrgentReview = async (queueId) => {
@@ -334,7 +302,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
       setQuickIntakeState({
         loading: false,
         error: "",
-        success: `Patient added with token ${response.case.currentVisit.tokenLabel || `#${response.case.currentVisit.token}`} in ${response.case.currentVisit.department}. Use Open Case only if profile or clinical details need follow-up.`,
+        success: `Patient added with token #${response.case.currentVisit.token} in ${response.case.currentVisit.department}. Use Open Case only if profile or clinical details need follow-up.`,
       });
       setQuickIntakeForm({
         name: "",
@@ -406,30 +374,10 @@ export default function ReceptionDashboard({ user, onLogout }) {
             <div style={{ marginTop: 12 }}>
               {lookupResult ? (
                 <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, background: "#F8FAFC", padding: 12 }}>
-                  {lookupMatches.length > 1 ? (
-                    <div style={{ marginBottom: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {lookupMatches.map((item) => (
-                        <button
-                          key={`${item.patientId}-${item.queueId || "no-queue"}`}
-                          type="button"
-                          onClick={() => setLookupResult(item)}
-                          style={{
-                            ...btnGhost,
-                            padding: "5px 8px",
-                            fontSize: 12,
-                            borderColor: lookupResult.patientId === item.patientId && lookupResult.queueId === item.queueId ? COLORS.navy : "#CBD5E1",
-                            color: lookupResult.patientId === item.patientId && lookupResult.queueId === item.queueId ? COLORS.navy : "#334155",
-                          }}
-                        >
-                          {item.name} | ID {item.patientId}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 18 }}>{lookupResult.name}</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>Token {lookupResult.tokenLabel || `#${lookupResult.token}`} | Patient ID {lookupResult.patientId}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>Token #{lookupResult.token} | Patient ID {lookupResult.patientId}</div>
                     </div>
                     <PriorityPill priority={lookupResult.priority} />
                   </div>
@@ -442,11 +390,9 @@ export default function ReceptionDashboard({ user, onLogout }) {
                     <InfoBox label="Preferred Slot" value={lookupResult.preferredSlot} />
                   </div>
                   <div style={{ marginTop: 10, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: "10px 12px", fontSize: 13 }}>
-                    {lookupResult.hasActiveQueue
-                      ? `Front desk answer: Token ${lookupResult.tokenLabel || `#${lookupResult.token}`} in ${lookupResult.department} currently has about ${lookupResult.waitMins} minute(s) to go.`
-                      : `Front desk answer: No active queue right now. Latest visit is visible for profile/history follow-up.`}
+                    Front desk answer: Token #{lookupResult.token} in {lookupResult.department} currently has about {lookupResult.waitMins} minute(s) to go.
                   </div>
-                  {lookupResult.rawStatus === "waiting" && lookupResult.departmentId ? (
+                  {lookupResult.rawStatus === "waiting" ? (
                     <div style={{ marginTop: 10 }}>
                       <button type="button" onClick={() => callNextForDepartment(lookupResult.departmentId)} style={btnPrimary}>
                         Call Next For {lookupResult.department}
@@ -454,7 +400,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
                     </div>
                   ) : null}
                   <div style={{ marginTop: 10 }}>
-                    <button type="button" onClick={() => navigate(`/case/queue/${lookupResult.queueId}`)} style={{ ...btnGhost, opacity: lookupResult.queueId ? 1 : 0.6, cursor: lookupResult.queueId ? "pointer" : "not-allowed" }} disabled={!lookupResult.queueId}>
+                    <button type="button" onClick={() => navigate(`/case/queue/${lookupResult.queueId}`)} style={btnGhost}>
                       Open Patient Case
                     </button>
                   </div>
@@ -721,7 +667,7 @@ function DepartmentCard({ department, active, onSelect, onCallNext }) {
 function QueueRow({ row, urgentForm, setUrgentForm, onUrgentReview, onCallNext, onOpenCase }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "80px 1.5fr 1.1fr 1fr 1fr 1fr 1.4fr", padding: "10px 12px", fontSize: 12, color: "#334155", borderBottom: "1px solid #E2E8F0", alignItems: "center" }}>
-      <div style={{ fontFamily: "monospace", fontWeight: 800 }}>{row.tokenLabel || `#${row.token}`}</div>
+      <div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{row.token}</div>
       <div>
         <div style={{ fontWeight: 700 }}>{row.name}</div>
         <div style={{ fontSize: 11, color: "#64748B" }}>ID {row.patientId}</div>
