@@ -164,18 +164,15 @@ export default function ReceptionDashboard({ user, onLogout }) {
   useEffect(() => {
     setScreenState("loading");
     loadReceptionData();
+  }, [loadReceptionData]);
+
+  useEffect(() => {
+    if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadReceptionData();
     }, 15000);
-    const onFocus = () => {
-      loadReceptionData();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [loadReceptionData]);
+    return () => clearInterval(timer);
+  }, [screenState, loadReceptionData]);
 
   const receptionistStats = useMemo(() => {
     const waiting = queueRows.filter((row) => row.rawStatus === "waiting").length;

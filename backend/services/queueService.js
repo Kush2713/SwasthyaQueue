@@ -7,23 +7,14 @@ const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
 // Tries ML first, then falls back to deterministic triage rules so queueing never blocks.
 async function determinePriorityLevel({ symptoms, painScale, age, isPregnant, isDisabled }) {
   try {
-    const mlResponse = await axios.post(
-      `${ML_SERVICE_URL}/predict`,
-      {
-        age: age || 30,
-        pain_scale: painScale || 0,
-        symptom_code: 2,
-      },
-      { timeout: 3000 }
-    );
+    const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict`, {
+      age: age || 30,
+      pain_scale: painScale || 0,
+      symptom_code: 2,
+    });
 
-    const modelPriority = Number(mlResponse?.data?.priority);
-    if ([1, 2, 3].includes(modelPriority)) {
-      return modelPriority;
-    }
-    return 3;
+    return mlResponse.data.priority;
   } catch (mlError) {
-    console.warn("ML service unavailable, using fallback triage rules:", mlError.message);
     let priorityLevel = 3;
     const normalizedSymptoms = String(symptoms || "").toLowerCase();
 

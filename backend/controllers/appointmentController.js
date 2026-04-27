@@ -563,18 +563,13 @@ async function createAppointment(req, res) {
       return res.status(400).json({ error: slotError.message });
     }
 
-    let priorityLevel = 3;
-    try {
-      priorityLevel = await determinePriorityLevel({
-        symptoms,
-        painScale: Number(pain_scale) || 0,
-        age: patient.age,
-        isPregnant: Boolean(is_pregnant),
-        isDisabled: Boolean(is_disabled),
-      });
-    } catch (err) {
-      console.warn("ML service unavailable, using default priority:", err.message);
-    }
+    const priorityLevel = await determinePriorityLevel({
+      symptoms,
+      painScale: Number(pain_scale) || 0,
+      age: patient.age,
+      isPregnant: Boolean(is_pregnant),
+      isDisabled: Boolean(is_disabled),
+    });
 
     const appointmentResult = await client.query(
       `
@@ -751,18 +746,13 @@ async function createQuickIntake(req, res) {
       );
 
     const appointment = appointmentResult.rows[0];
-    let suggestedPriorityLevel = 3;
-    try {
-      suggestedPriorityLevel = await determinePriorityLevel({
-        symptoms: appointment.symptoms,
-        painScale: 0,
-        age: patientAge,
-        isPregnant: false,
-        isDisabled: false,
-      });
-    } catch (err) {
-      console.warn("ML service unavailable, using default priority:", err.message);
-    }
+    const suggestedPriorityLevel = await determinePriorityLevel({
+      symptoms: appointment.symptoms,
+      painScale: 0,
+      age: patientAge,
+      isPregnant: false,
+      isDisabled: false,
+    });
     const priorityLevel = Math.min(suggestedPriorityLevel, 2);
 
     const queue = await createQueueEntry(client, {

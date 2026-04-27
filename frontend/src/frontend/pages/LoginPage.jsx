@@ -49,7 +49,6 @@ function normalizeMobile(value = "") {
 }
 
 export default function LoginPage({ onLogin }) {
-  const isOtpPreviewMode = process.env.NEXT_PUBLIC_OTP_PREVIEW === "true";
   const [activeRole, setActiveRole] = useState("patient");
   const [patientMode, setPatientMode] = useState("login");
   const [patientStep, setPatientStep] = useState("request");
@@ -190,12 +189,6 @@ export default function LoginPage({ onLogin }) {
     <div className="min-h-screen bg-[#EEF2F7]">
       <TricolorStrip />
       <GovHeader />
-
-      {isOtpPreviewMode ? (
-        <div className="bg-amber-500 px-4 py-2 text-center text-xs font-semibold text-amber-950 sm:text-sm">
-          Demo Mode - OTP is printed in backend console, not sent via SMS.
-        </div>
-      ) : null}
 
       <main className="px-4 py-10">
         <div className="mx-auto w-full max-w-[540px]">

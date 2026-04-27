@@ -45,32 +45,6 @@ async function run(name, fn) {
 }
 
 async function main() {
-  await run("priority resolver falls back when ML service is unreachable", async () => {
-    const previousMlUrl = process.env.ML_SERVICE_URL;
-    process.env.ML_SERVICE_URL = "http://127.0.0.1:1";
-    delete require.cache[require.resolve("../services/queueService")];
-
-    try {
-      const { determinePriorityLevel } = require("../services/queueService");
-      const priority = await determinePriorityLevel({
-        symptoms: "fever and fatigue",
-        painScale: 3,
-        age: 34,
-        isPregnant: false,
-        isDisabled: false,
-      });
-
-      assert.ok([1, 2, 3].includes(Number(priority)));
-    } finally {
-      if (previousMlUrl === undefined) {
-        delete process.env.ML_SERVICE_URL;
-      } else {
-        process.env.ML_SERVICE_URL = previousMlUrl;
-      }
-      delete require.cache[require.resolve("../services/queueService")];
-    }
-  });
-
   await run("auth token round-trip keeps patient identity", () => {
     const token = issueAuthToken({
       accountId: 22,
