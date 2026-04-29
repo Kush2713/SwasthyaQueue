@@ -93,6 +93,7 @@ export default function StaffDashboard({ user, onLogout }) {
   const [deptFilter, setDeptFilter] = useState("All");
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
+  const [lookupSearched, setLookupSearched] = useState(false);
   const [toast, setToast] = useState("");
   const [screenState, setScreenState] = useState("loading");
   const [loadError, setLoadError] = useState("");
@@ -543,6 +544,7 @@ export default function StaffDashboard({ user, onLogout }) {
     const query = lookupQuery.trim();
     if (!query) {
       setLookupResult(null);
+      setLookupSearched(false);
       return;
     }
 
@@ -552,6 +554,7 @@ export default function StaffDashboard({ user, onLogout }) {
       const first = response?.patients?.[0] || null;
       if (!first) {
         setLookupResult(null);
+        setLookupSearched(true);
         pushToast("No matching patient found.");
         return;
       }
@@ -576,8 +579,10 @@ export default function StaffDashboard({ user, onLogout }) {
         visitHistory: first.visitHistory || [],
       };
       setLookupResult(mapped);
+      setLookupSearched(true);
       pushToast(`Patient found: ${mapped.name}`);
     } catch (error) {
+      setLookupSearched(true);
       pushToast(error.message || "Unable to run patient lookup.");
     }
   };
@@ -751,7 +756,10 @@ export default function StaffDashboard({ user, onLogout }) {
                 </div>
               </section>
             ) : (
-              <InlineEmpty title="Search for a patient" description="Use token number or patient name to find the patient record." />
+              <InlineEmpty
+                title={lookupSearched ? "No patient found" : "Search for a patient"}
+                description={lookupSearched ? "Try full mobile number, token, or exact patient name." : "Use token number or patient name to find the patient record."}
+              />
             )}
           </section>
         ) : null}
