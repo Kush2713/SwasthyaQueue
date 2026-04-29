@@ -130,13 +130,15 @@ From this folder:
 
 ```powershell
 npm.cmd install
-npm.cmd start
+npm.cmd run dev
 ```
 
-Reset demo data quickly:
+Data state commands:
 
 ```powershell
-npm.cmd run demo:reset
+npm.cmd run empty-run
+npm.cmd run complete-run
+npm.cmd run test:e2e:smoke
 ```
 
 Default local URL:

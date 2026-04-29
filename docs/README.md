@@ -11,6 +11,12 @@ Use these documents when you want to understand:
 
 ## Files In This Folder
 
+Run-state helpers (from `backend/`) for demos:
+
+- `npm.cmd run empty-run` -> clear all operational records
+- `npm.cmd run complete-run` -> load full baseline + rush demo dataset
+- `npm.cmd run test:e2e:smoke` -> automated API workflow verification
+
 ### [WORKFLOWS.md](WORKFLOWS.md)
 
 Use this when you want the operational flow.

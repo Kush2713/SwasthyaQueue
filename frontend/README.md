@@ -141,6 +141,21 @@ $env:PORT='3000'
 npm.cmd run dev
 ```
 
+## Quick Integration Check
+
+Before opening frontend pages, make sure backend is running at:
+
+- `http://127.0.0.1:5000`
+
+Then use backend data helpers for easy demos:
+
+```powershell
+cd ../backend
+npm.cmd run empty-run
+# or
+npm.cmd run complete-run
+```
+
 ## Build
 
 ```powershell

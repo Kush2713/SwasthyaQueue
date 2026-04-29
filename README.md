@@ -1,20 +1,73 @@
 # SwasthyaQueue
 
-SwasthyaQueue is a digital OPD queue and visit-management system designed for Indian hospitals and clinics. It combines:
+SwasthyaQueue is a digital OPD queue and visit-management system for Indian hospitals.
 
-- patient self-service
-- front-desk assisted registration
-- nurse triage
-- doctor consultation workflow
-- live queue visibility
+It includes:
+- patient self-service booking
+- receptionist operations
+- nurse triage handoff
+- doctor consultation closure
+- live lobby queue display
 
-The current repository includes:
+Tech stack:
+- `frontend/` Next.js
+- `backend/` Node.js + Express + PostgreSQL
+- `ml-service/` Flask (triage priority support)
 
-- a Next.js frontend
-- a Node.js + Express backend
-- a Python Flask ML service for triage support
-- a PostgreSQL database
-- Render deployment support
+## 5-Minute Reviewer Start
+
+Run these steps exactly in 3 terminals.
+
+1. Start backend
+```powershell
+cd backend
+npm.cmd install
+npm.cmd run dev
+```
+
+2. Start frontend
+```powershell
+cd frontend
+npm.cmd install
+npm.cmd run dev
+```
+
+3. Start ML service (optional but recommended)
+```powershell
+cd ml-service
+python -m pip install -r requirements.txt
+python app.py
+```
+
+4. Load data state you want
+```powershell
+cd backend
+npm.cmd run empty-run
+```
+or
+```powershell
+cd backend
+npm.cmd run complete-run
+```
+
+5. Optional automated flow test
+```powershell
+cd backend
+npm.cmd run test:e2e:smoke
+```
+
+Primary URLs:
+- Frontend: `http://localhost:3001`
+- Backend: `http://localhost:5000`
+- Display TV page: `http://localhost:3001/display`
+- API playground: `http://localhost:5000/playground`
+
+## Quick Command Reference
+
+From `backend/`:
+- `npm.cmd run empty-run` -> clear operational data
+- `npm.cmd run complete-run` -> load full demo+rush dataset
+- `npm.cmd run test:e2e:smoke` -> run end-to-end API smoke flow
 
 ## Why This Project Exists
 
@@ -167,65 +220,11 @@ Useful docs added in this repo:
 
 ## Local Setup
 
-Start each service in a separate terminal.
-
-### PostgreSQL
-
-Make sure PostgreSQL is running locally on:
-
-- `localhost:5432`
-
-### Backend
-
-From `backend/`:
-
-```powershell
-npm.cmd install
-npm.cmd start
-```
-
-Runs on:
-
-- `http://localhost:5000`
-
-Quick checks:
-
-- `http://localhost:5000/`
-- `http://localhost:5000/test-db`
-- `http://localhost:5000/playground`
-
-### ML Service
-
-From `ml-service/`:
-
-```powershell
-python -m pip install -r requirements.txt
-python app.py
-```
-
-Runs on:
-
-- `http://localhost:5001`
-
-### Frontend
-
-From `frontend/`:
-
-```powershell
-npm.cmd install
-npm.cmd run dev
-```
-
-Default dev URL:
-
-- `http://localhost:3001`
-
-Optional:
-
-```powershell
-$env:PORT='3000'
-npm.cmd run dev
-```
+Use the quick start above.  
+Detailed setup and module notes:
+- [backend/README.md](backend/README.md)
+- [frontend/README.md](frontend/README.md)
+- [ml-service/README.md](ml-service/README.md)
 
 ## Environment Variables
 
@@ -289,6 +288,13 @@ Main routes:
 - `/case/queue/:queueId`
 - `/display`
 - `/tv`
+
+## Recommended Demo Sequence
+
+1. `npm.cmd run empty-run` and show empty state.
+2. `npm.cmd run complete-run` and refresh dashboards.
+3. Show `Reception -> Nurse -> Doctor -> Patient History`.
+4. Open `/display` and verify TV queue readability.
 
 ## Backend APIs
 
