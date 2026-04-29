@@ -6,6 +6,7 @@ const {
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { formatTokenLabel } = require("../utils/tokenLabel");
 
 function mapAppointmentRow(row) {
   return {
@@ -21,6 +22,12 @@ function mapAppointmentRow(row) {
     updatedAt: row.updated_at,
     queueId: row.queue_id,
     token: row.token_number,
+    tokenLabel: formatTokenLabel({
+      departmentName: row.department_name,
+      departmentId: row.department_id,
+      queueCreatedAt: row.queue_created_at || row.created_at,
+      tokenNumber: row.token_number,
+    }),
     priorityLevel: row.priority_level,
     queueStatus: row.queue_status,
     triage: {
@@ -81,6 +88,7 @@ async function getAppointmentDetails(db, appointmentId) {
         d.name AS department_name,
         q.queue_id,
         q.token_number,
+        q.created_at AS queue_created_at,
         q.priority_level,
         q.status AS queue_status
       FROM appointments a
@@ -103,6 +111,7 @@ async function getCasePayload(db, queueId) {
         q.department_id,
         q.priority_level,
         q.token_number,
+        q.created_at AS queue_created_at,
         q.status AS queue_status,
         q.created_at AS queued_at,
         q.urgent_review_requested,
@@ -243,6 +252,12 @@ async function getCasePayload(db, queueId) {
       departmentId: current.department_id,
       department: current.department_name,
       token: current.token_number,
+      tokenLabel: formatTokenLabel({
+        departmentName: current.department_name,
+        departmentId: current.department_id,
+        queueCreatedAt: current.queue_created_at || current.queued_at || current.appointment_created_at,
+        tokenNumber: current.token_number,
+      }),
       priorityLevel: current.priority_level,
       queueStatus: current.queue_status,
       appointmentStatus: current.appointment_status,
@@ -283,6 +298,12 @@ async function getCasePayload(db, queueId) {
       appointmentId: row.appointment_id,
       queueId: row.queue_id,
       token: row.token_number,
+      tokenLabel: formatTokenLabel({
+        departmentName: row.department_name,
+        departmentId: row.department_id,
+        queueCreatedAt: row.queue_created_at || row.created_at,
+        tokenNumber: row.token_number,
+      }),
       departmentId: row.department_id,
       department: row.department_name,
       symptoms: row.symptoms,
@@ -780,6 +801,7 @@ async function getMyActiveAppointment(req, res) {
           d.name AS department_name,
           q.queue_id,
           q.token_number,
+          q.created_at AS queue_created_at,
           q.priority_level,
           q.status AS queue_status
         FROM appointments a
@@ -829,6 +851,7 @@ async function getMyAppointmentHistory(req, res) {
           d.name AS department_name,
           q.queue_id,
           q.token_number,
+          q.created_at AS queue_created_at,
           q.priority_level,
           q.status AS queue_status
         FROM appointments a

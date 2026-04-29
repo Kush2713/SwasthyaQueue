@@ -5,6 +5,7 @@ const {
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { formatTokenLabel } = require("../utils/tokenLabel");
 
 function toNullableNumber(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -12,13 +13,27 @@ function toNullableNumber(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-function validateTriageVitals({ temperatureC, pulseRate, spo2, weightKg, bloodPressure }) {
-  if (Number.isNaN(temperatureC) || Number.isNaN(pulseRate) || Number.isNaN(spo2) || Number.isNaN(weightKg)) {
+function toFahrenheitFromCelsius(value) {
+  if (value === null) return null;
+  return Number(((value * 9) / 5 + 32).toFixed(1));
+}
+
+function getTemperatureF(reqBody) {
+  const tempF = toNullableNumber(reqBody.temperature_f);
+  if (tempF !== null) return tempF;
+  const temp = toNullableNumber(reqBody.temperature_c);
+  if (temp === null || Number.isNaN(temp)) return temp;
+  if (temp <= 45) return toFahrenheitFromCelsius(temp);
+  return temp;
+}
+
+function validateTriageVitals({ temperatureF, pulseRate, spo2, weightKg, bloodPressure }) {
+  if (Number.isNaN(temperatureF) || Number.isNaN(pulseRate) || Number.isNaN(spo2) || Number.isNaN(weightKg)) {
     return "Vitals must be valid numbers.";
   }
 
-  if (temperatureC !== null && (temperatureC < 30 || temperatureC > 45)) {
-    return "Temperature should be between 30 and 45 C.";
+  if (temperatureF !== null && (temperatureF < 86 || temperatureF > 113)) {
+    return "Temperature should be between 86 and 113 F.";
   }
 
   if (pulseRate !== null && (pulseRate < 20 || pulseRate > 240)) {
@@ -109,11 +124,12 @@ const getQueueByDepartment = async (req, res) => {
     const { department_id } = req.params;
 
     const dept = await pool.query(
-      "SELECT avg_consult_time FROM departments WHERE department_id = $1",
+      "SELECT name, avg_consult_time FROM departments WHERE department_id = $1",
       [department_id]
     );
 
     const avgTime = dept.rows[0].avg_consult_time;
+    const departmentName = dept.rows[0].name;
 
     const result = await pool.query(
       `
@@ -155,6 +171,12 @@ const getQueueByDepartment = async (req, res) => {
 
     const enhancedQueue = result.rows.map((patient, index) => ({
       ...patient,
+      token_label: formatTokenLabel({
+        departmentName,
+        departmentId: department_id,
+        queueCreatedAt: patient.created_at,
+        tokenNumber: patient.token_number,
+      }),
       estimated_wait_time: index * avgTime,
     }));
 
@@ -379,7 +401,8 @@ const getPosition = async (req, res) => {
       `
         SELECT *
         FROM queue
-        WHERE department_id = $1 AND status IN ('waiting', 'in-progress')
+        WHERE department_id = $1
+          AND status IN ('waiting', 'in-progress')
         ORDER BY priority_level ASC, token_number ASC
       `,
       [department_id]
@@ -521,7 +544,7 @@ const recordNurseTriage = async (req, res) => {
     const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
     const assessedByName = String(actor.name || req.body.assessed_by_name || "Triage Nurse").trim();
     const triageNotes = String(req.body.triage_notes || "").trim();
-    const temperatureC = toNullableNumber(req.body.temperature_c);
+    const temperatureF = getTemperatureF(req.body);
     const pulseRate = toNullableNumber(req.body.pulse_rate);
     const spo2 = toNullableNumber(req.body.spo2);
     const weightKg = toNullableNumber(req.body.weight_kg);
@@ -536,7 +559,7 @@ const recordNurseTriage = async (req, res) => {
     }
 
     const validationError = validateTriageVitals({
-      temperatureC,
+      temperatureF,
       pulseRate,
       spo2,
       weightKg,
@@ -574,7 +597,7 @@ const recordNurseTriage = async (req, res) => {
           a.assessed_by_name,
           a.assessed_at
       `,
-      [queueId, temperatureC, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null, assessedByName]
+      [queueId, temperatureF, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null, assessedByName]
     );
 
     if (!result.rows.length) {
@@ -589,7 +612,7 @@ const recordNurseTriage = async (req, res) => {
       appointmentId: result.rows[0].appointment_id,
       queueId,
       details: {
-        temperatureC,
+        temperatureF,
         bloodPressure: bloodPressure || null,
         pulseRate,
         spo2,
@@ -614,7 +637,7 @@ const markReadyForDoctor = async (req, res) => {
     const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
     const assessedByName = String(actor.name || req.body.assessed_by_name || "Triage Nurse").trim();
     const triageNotes = String(req.body.triage_notes || "").trim();
-    const temperatureC = toNullableNumber(req.body.temperature_c);
+    const temperatureF = getTemperatureF(req.body);
     const pulseRate = toNullableNumber(req.body.pulse_rate);
     const spo2 = toNullableNumber(req.body.spo2);
     const weightKg = toNullableNumber(req.body.weight_kg);
@@ -625,7 +648,7 @@ const markReadyForDoctor = async (req, res) => {
     }
 
     const validationError = validateTriageVitals({
-      temperatureC,
+      temperatureF,
       pulseRate,
       spo2,
       weightKg,
@@ -655,7 +678,7 @@ const markReadyForDoctor = async (req, res) => {
           AND q.status IN ('waiting', 'in-progress')
         RETURNING a.appointment_id, a.patient_id, a.status, a.assessed_by_name, a.assessed_at
       `,
-      [queueId, assessedByName, temperatureC, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null]
+      [queueId, assessedByName, temperatureF, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null]
     );
 
     if (!result.rows.length) {
@@ -671,7 +694,7 @@ const markReadyForDoctor = async (req, res) => {
       appointmentId: result.rows[0].appointment_id,
       queueId,
       details: {
-        temperatureC,
+        temperatureF,
         bloodPressure: bloodPressure || null,
         pulseRate,
         spo2,

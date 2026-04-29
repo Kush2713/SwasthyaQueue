@@ -16,7 +16,7 @@ const {
 } = require("../controllers/queueController");
 const { requireRoles } = require("../middleware/authMiddleware");
 
-router.get("/stats", requireRoles(["receptionist", "nurse", "doctor"]), getStats);
+router.get("/stats", getStats);
 router.get("/position/:patient_id/:department_id", requireRoles(["patient", "receptionist", "nurse", "doctor"]), getPosition);
 
 router.post("/add", requireRoles(["receptionist"]), addToQueue);
@@ -28,6 +28,6 @@ router.post("/:queue_id/override-priority", requireRoles(["nurse"]), approvePrio
 router.post("/:queue_id/triage", requireRoles(["nurse"]), recordNurseTriage);
 router.post("/:queue_id/ready-for-doctor", requireRoles(["nurse"]), markReadyForDoctor);
 
-router.get("/:department_id", requireRoles(["receptionist", "nurse", "doctor"]), getQueueByDepartment);
+router.get("/:department_id", getQueueByDepartment);
 
 module.exports = router;

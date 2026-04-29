@@ -42,11 +42,11 @@ async function determinePriorityLevel({ symptoms, painScale, age, isPregnant, is
 
 async function createQueueEntry(db, { appointmentId, patientId, departmentId, priorityLevel }) {
   const countResult = await db.query(
-    "SELECT COUNT(*) FROM queue WHERE department_id = $1",
+    "SELECT COALESCE(MAX(token_number), 0) AS max_token FROM queue WHERE department_id = $1",
     [departmentId]
   );
 
-  const tokenNumber = parseInt(countResult.rows[0].count, 10) + 1;
+  const tokenNumber = parseInt(countResult.rows[0].max_token, 10) + 1;
 
   const result = await db.query(
     `

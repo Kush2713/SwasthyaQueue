@@ -1,6 +1,8 @@
 const pool = require("../db");
 const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { formatTokenLabel } = require("../utils/tokenLabel");
+const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
 
 // Register Patient
 const registerPatient = async (req, res) => {
@@ -204,5 +206,151 @@ const updatePatientProfileById = async (req, res) => {
   }
 };
 
+const lookupPatients = async (req, res) => {
+  try {
+    const rawQuery = String(req.query.q || "").trim();
+    if (!rawQuery) {
+      return res.status(400).json({ error: "Search query is required." });
+    }
+
+    const numericQuery = Number(rawQuery);
+    const digitsQuery = rawQuery.replace(/\D/g, "");
+    const likeQuery = `%${rawQuery.toLowerCase()}%`;
+    const likeDigitsQuery = `%${digitsQuery}%`;
+
+    const result = await pool.query(
+      `
+        SELECT
+          p.patient_id,
+          p.name,
+          p.age,
+          p.gender,
+          p.phone,
+          p.email,
+          p.address,
+          p.emergency_contact,
+          latest.appointment_id,
+          latest.appointment_status,
+          latest.department_id,
+          latest.department_name,
+          latest.symptoms,
+          latest.preferred_slot,
+          latest.appointment_created_at,
+          latest.queue_id,
+          latest.token_number,
+          latest.queue_status,
+          latest.priority_level,
+          latest.queue_created_at
+        FROM patients p
+        LEFT JOIN LATERAL (
+          SELECT
+            a.appointment_id,
+            a.status AS appointment_status,
+            a.department_id,
+            d.name AS department_name,
+            a.symptoms,
+            a.preferred_slot,
+            a.created_at AS appointment_created_at,
+            q.queue_id,
+            q.token_number,
+            q.status AS queue_status,
+            q.priority_level,
+            q.created_at AS queue_created_at
+          FROM appointments a
+          JOIN departments d ON d.department_id = a.department_id
+          LEFT JOIN queue q ON q.appointment_id = a.appointment_id
+          WHERE a.patient_id = p.patient_id
+          ORDER BY a.created_at DESC
+          LIMIT 1
+        ) latest ON TRUE
+        WHERE
+          ($2::bigint IS NOT NULL AND p.patient_id = $2::bigint)
+          OR (
+            $2::bigint IS NOT NULL
+            AND latest.token_number = $2::bigint
+            AND latest.queue_status IN ('waiting', 'in-progress')
+            AND EXISTS (
+              SELECT 1
+              FROM queue q2
+              WHERE q2.queue_id = latest.queue_id
+                AND q2.created_at >= ((CURRENT_TIMESTAMP AT TIME ZONE $6)::date)::timestamp
+            )
+          )
+          OR ($3::text <> '' AND REGEXP_REPLACE(COALESCE(p.phone, ''), '\\D', '', 'g') LIKE $4)
+          OR ($3::text <> '' AND REGEXP_REPLACE(COALESCE(p.emergency_contact, ''), '\\D', '', 'g') LIKE $4)
+          OR LOWER(p.name) LIKE $1
+          OR LOWER(COALESCE(p.email, '')) LIKE $1
+          OR LOWER(COALESCE(p.address, '')) LIKE $1
+        ORDER BY
+          CASE
+            WHEN $2::bigint IS NOT NULL AND p.patient_id = $2::bigint THEN 0
+            WHEN REGEXP_REPLACE(COALESCE(p.phone, ''), '\\D', '', 'g') = $3 THEN 1
+            WHEN REGEXP_REPLACE(COALESCE(p.emergency_contact, ''), '\\D', '', 'g') = $3 THEN 2
+            WHEN (
+              $2::bigint IS NOT NULL
+              AND latest.token_number = $2::bigint
+              AND latest.queue_status IN ('waiting', 'in-progress')
+            ) THEN 3
+            WHEN LOWER(p.name) = LOWER($5) THEN 4
+            ELSE 5
+          END,
+          p.name ASC
+        LIMIT 20
+      `,
+      [
+        likeQuery,
+        Number.isFinite(numericQuery) ? numericQuery : null,
+        digitsQuery,
+        likeDigitsQuery,
+        rawQuery,
+        HOSPITAL_TIMEZONE,
+      ]
+    );
+
+    const patients = result.rows.map((row) => ({
+      patientId: row.patient_id,
+      name: row.name,
+      age: row.age,
+      gender: row.gender,
+      mobile: row.phone,
+      email: row.email,
+      address: row.address,
+      emergencyContact: row.emergency_contact,
+      latestVisit: row.appointment_id
+        ? {
+            appointmentId: row.appointment_id,
+            appointmentStatus: row.appointment_status,
+            departmentId: row.department_id,
+            department: row.department_name,
+            symptoms: row.symptoms,
+            preferredSlot: row.preferred_slot,
+            createdAt: row.appointment_created_at,
+            queueId: row.queue_id,
+            token: row.token_number,
+            tokenLabel: formatTokenLabel({
+              departmentName: row.department_name,
+              departmentId: row.department_id,
+              queueCreatedAt: row.queue_created_at || row.appointment_created_at,
+              tokenNumber: row.token_number,
+            }),
+            queueStatus: row.queue_status,
+            priorityLevel: row.priority_level,
+            queuedAt: row.queue_created_at,
+          }
+        : null,
+      hasActiveQueue: ["waiting", "in-progress"].includes(row.queue_status),
+    }));
+
+    res.json({
+      query: rawQuery,
+      count: patients.length,
+      patients,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to search patient records right now." });
+  }
+};
+
 // Export function
-module.exports = { registerPatient, updatePatientProfile, updatePatientProfileById };
+module.exports = { registerPatient, updatePatientProfile, updatePatientProfileById, lookupPatients };
