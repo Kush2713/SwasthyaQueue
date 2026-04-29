@@ -268,6 +268,14 @@ export default function StaffDashboard({ user, onLogout }) {
     [patients]
   );
 
+  const triageWorkspacePatients = useMemo(() => {
+    const byQueueId = new Map();
+    [...urgentReviewPatients, ...triagePatients].forEach((patient) => {
+      if (!byQueueId.has(patient.queueId)) byQueueId.set(patient.queueId, patient);
+    });
+    return Array.from(byQueueId.values());
+  }, [urgentReviewPatients, triagePatients]);
+
   const assessedTodayPatients = useMemo(
     () =>
       patients
@@ -285,19 +293,19 @@ export default function StaffDashboard({ user, onLogout }) {
 
   useEffect(() => {
     if (!isNurse) return;
-    if (!triagePatients.length) {
+    if (!triageWorkspacePatients.length) {
       setSelectedTriageQueueId(null);
       return;
     }
 
-    if (triagePatients.some((patient) => patient.queueId === selectedTriageQueueId)) return;
-    const nextPatient = urgentReviewPatients[0] || triagePatients[0];
+    if (triageWorkspacePatients.some((patient) => patient.queueId === selectedTriageQueueId)) return;
+    const nextPatient = urgentReviewPatients[0] || triagePatients[0] || triageWorkspacePatients[0];
     setSelectedTriageQueueId(nextPatient?.queueId || null);
-  }, [isNurse, triagePatients, urgentReviewPatients, selectedTriageQueueId]);
+  }, [isNurse, triageWorkspacePatients, triagePatients, urgentReviewPatients, selectedTriageQueueId]);
 
   const selectedTriagePatient = useMemo(
-    () => triagePatients.find((patient) => patient.queueId === selectedTriageQueueId) || null,
-    [triagePatients, selectedTriageQueueId]
+    () => triageWorkspacePatients.find((patient) => patient.queueId === selectedTriageQueueId) || null,
+    [triageWorkspacePatients, selectedTriageQueueId]
   );
 
   const doctorPatients = useMemo(
