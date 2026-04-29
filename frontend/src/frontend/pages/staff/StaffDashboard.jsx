@@ -918,9 +918,11 @@ export default function StaffDashboard({ user, onLogout }) {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                               <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
-                              <button type="button" onClick={() => confirmPriority(patient)} style={{ ...btnGhost, borderColor: "#2563EB", color: "#1D4ED8" }}>
-                                {patient.priorityHumanConfirmed ? "Priority" : "Confirm Priority"}
-                              </button>
+                              {patient.urgentReviewRequested && !patient.priorityHumanConfirmed ? (
+                                <button type="button" onClick={() => confirmPriority(patient)} style={{ ...btnGhost, borderColor: "#2563EB", color: "#1D4ED8" }}>
+                                  Confirm Priority
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => (triageReady ? markReady(patient) : saveTriage(patient))}

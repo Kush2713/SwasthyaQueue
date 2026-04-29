@@ -70,6 +70,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const [query, setQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupMatches, setLookupMatches] = useState([]);
+  const [lookupSearched, setLookupSearched] = useState(false);
   const [activeDepartment, setActiveDepartment] = useState("All");
   const [urgentForm, setUrgentForm] = useState({ queueId: null, reason: "" });
   const [assistedForm, setAssistedForm] = useState({
@@ -206,6 +207,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
     if (!normalizedQuery) {
       setLookupResult(null);
       setLookupMatches([]);
+      setLookupSearched(false);
       return;
     }
 
@@ -242,10 +244,12 @@ export default function ReceptionDashboard({ user, onLogout }) {
 
       setLookupMatches(mappedMatches);
       setLookupResult(mappedMatches[0] || null);
+      setLookupSearched(true);
     } catch (err) {
       setLoadError(err.message || "Unable to search patients right now.");
       setLookupMatches([]);
       setLookupResult(null);
+      setLookupSearched(true);
     }
   };
 
@@ -454,7 +458,10 @@ export default function ReceptionDashboard({ user, onLogout }) {
                 </div>
               ) : (
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <InlineEmpty title="No patient selected" description="Use token, name, or mobile to answer lobby questions quickly." />
+                  <InlineEmpty
+                    title={lookupSearched ? "No patient found" : "No patient selected"}
+                    description={lookupSearched ? "Try full mobile number, token, or exact patient name." : "Use token, name, or mobile to answer lobby questions quickly."}
+                  />
                 </div>
               )}
             </div>
