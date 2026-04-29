@@ -93,6 +93,7 @@ SwasthyaQueue aims to improve that by giving:
 
 - patient OTP signup/login
 - patient dashboard with active visit and history
+- auto queue movement notifications on patient dashboard (called to triage, called to consultation, visit completed)
 - patient booking flow with symptoms, review, and token generation
 - preferred date/time capture for booking
 - patient visit cancellation
@@ -110,8 +111,7 @@ SwasthyaQueue aims to improve that by giving:
 - doctor diagnosis / prescription / notes / completion
 - shared patient case page
 - display screen / lobby queue board
-- department + day scoped tokening with formatted labels (`GEN-YYYY-MM-DD-###`)
-- fixed hospital-timezone operational day logic (`Asia/Kolkata` by default)
+- formatted token labels (`GEN-YYYY-MM-DD-###`) for clarity across departments
 - stale queue auto-closure housekeeping job
 - backend + PostgreSQL integration
 - backend + ML integration
@@ -143,6 +143,7 @@ Patient can:
 - see active appointment
 - cancel active appointment
 - view past appointments
+- get short live queue-status notifications on dashboard
 
 ### Receptionist
 
@@ -193,7 +194,7 @@ Rules:
 - frontend talks only to backend
 - backend owns workflow rules and persistence
 - PostgreSQL is the source of truth
-- ML only assists with triage priority, not core storage
+- ML assists priority internally (UI does not expose ML debug/suggestion text)
 
 ## Repository Layout
 

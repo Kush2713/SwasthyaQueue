@@ -265,6 +265,7 @@ Hosted setups can use:
 - queue priority is still controlled by backend rules, not free-form frontend ordering
 - token numbers are unique per department per operational day (not globally unique forever)
 - patient lookup prioritizes patient ID/mobile before token-only fallback
+- patient-facing queue status updates are consumed by frontend polling
 - frontend validation exists for better UX, but backend validates again for safety
 - `OTP_PREVIEW_ENABLED` is only for demo/local testing and should be disabled in production-like use
 

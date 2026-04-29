@@ -46,6 +46,7 @@ Patient can:
 - see active appointment
 - cancel active appointment
 - view history
+- see short live queue updates (called to triage, called to consultation, visit completed)
 
 ### Receptionist
 
@@ -192,6 +193,7 @@ NEXT_PUBLIC_OTP_PREVIEW=true
 - React Router handles in-app route flow
 - the API layer in `src/frontend/lib/api.js` centralizes backend communication
 - the case page acts as the shared patient/visit view across roles
+- patient profile flow now uses a single contact field (mobile) in booking/signup UX
 
 ## Practical Notes
 
