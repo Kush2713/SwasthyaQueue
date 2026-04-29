@@ -159,6 +159,11 @@ export function updatePatientProfileById(patientId, payload) {
   });
 }
 
+export function lookupPatients(query) {
+  const encoded = encodeURIComponent(String(query || "").trim());
+  return request(`/api/patients/lookup?q=${encoded}`);
+}
+
 export function saveDoctorUpdate(appointmentId, payload) {
   return request(`/api/appointments/${appointmentId}/doctor-update`, {
     method: "POST",

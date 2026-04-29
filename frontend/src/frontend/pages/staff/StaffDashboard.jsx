@@ -26,6 +26,21 @@ function statusLabel(status) {
   return status;
 }
 
+function toNullableNumber(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildClinicalFlags({ temperatureF, pulseRate, spo2, painScale }) {
+  const flags = [];
+  if (spo2 !== null && spo2 < 94) flags.push({ label: "Low SpO2", tone: "critical" });
+  if (pulseRate !== null && pulseRate > 110) flags.push({ label: "High Pulse", tone: "high" });
+  if (temperatureF !== null && temperatureF >= 100.4) flags.push({ label: "Fever", tone: "high" });
+  if (Number(painScale) >= 7) flags.push({ label: "High Pain", tone: "high" });
+  return flags;
+}
+
 function validateTriageDraft(draft) {
   const toNumber = (value) => {
     if (value === "" || value === null || value === undefined) return null;
@@ -33,18 +48,18 @@ function validateTriageDraft(draft) {
     return Number.isFinite(parsed) ? parsed : NaN;
   };
 
-  const temperatureC = toNumber(draft.temperature_c);
+  const temperatureF = toNumber(draft.temperature_c);
   const pulseRate = toNumber(draft.pulse_rate);
   const spo2 = toNumber(draft.spo2);
   const weightKg = toNumber(draft.weight_kg);
   const bloodPressure = String(draft.blood_pressure || "").trim();
 
-  if ([temperatureC, pulseRate, spo2, weightKg].some(Number.isNaN)) {
+  if ([temperatureF, pulseRate, spo2, weightKg].some(Number.isNaN)) {
     return "Vitals must be numeric values.";
   }
 
-  if (temperatureC !== null && (temperatureC < 30 || temperatureC > 45)) {
-    return "Temperature should be between 30 and 45 C.";
+  if (temperatureF !== null && (temperatureF < 86 || temperatureF > 113)) {
+    return "Temperature should be between 86 and 113 F.";
   }
 
   if (pulseRate !== null && (pulseRate < 20 || pulseRate > 240)) {
@@ -82,8 +97,12 @@ export default function StaffDashboard({ user, onLogout }) {
   const [loadError, setLoadError] = useState("");
   const [triageDrafts, setTriageDrafts] = useState({});
   const [doctorDrafts, setDoctorDrafts] = useState({});
+  const [triageReadyMap, setTriageReadyMap] = useState({});
+  const [doctorReadyMap, setDoctorReadyMap] = useState({});
   const [selectedTriageQueueId, setSelectedTriageQueueId] = useState(null);
   const [selectedDoctorQueueId, setSelectedDoctorQueueId] = useState(null);
+  const [doctorCaseMap, setDoctorCaseMap] = useState({});
+  const [doctorCaseLoading, setDoctorCaseLoading] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
     setLoadError("");
@@ -178,8 +197,15 @@ export default function StaffDashboard({ user, onLogout }) {
     if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadDashboardData();
-    }, 15000);
-    return () => clearInterval(timer);
+    }, 20000);
+    const onFocus = () => {
+      loadDashboardData();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [screenState, loadDashboardData]);
 
   const kpis = useMemo(() => {
@@ -287,12 +313,34 @@ export default function StaffDashboard({ user, onLogout }) {
     [doctorPatients, selectedDoctorQueueId]
   );
 
+  useEffect(() => {
+    if (!isDoctor || !selectedDoctorQueueId || doctorCaseMap[selectedDoctorQueueId]) return;
+    let cancelled = false;
+    setDoctorCaseLoading(true);
+    (async () => {
+      try {
+        const { getCaseByQueueId } = await import("../../lib/api");
+        const response = await getCaseByQueueId(selectedDoctorQueueId);
+        if (cancelled) return;
+        setDoctorCaseMap((prev) => ({ ...prev, [selectedDoctorQueueId]: response?.case || null }));
+      } catch (_error) {
+        if (!cancelled) {
+          setDoctorCaseMap((prev) => ({ ...prev, [selectedDoctorQueueId]: null }));
+        }
+      } finally {
+        if (!cancelled) setDoctorCaseLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDoctor, selectedDoctorQueueId, doctorCaseMap]);
+
   const pushToast = (message) => setToast(message);
 
   const getTriageDraft = useCallback(
     (patient) => {
       const existing = triageDrafts[patient.queueId];
-      if (existing) return existing;
       return {
         temperature_c: patient.temperatureC === "" ? "" : String(patient.temperatureC),
         blood_pressure: patient.bloodPressure || "",
@@ -300,6 +348,7 @@ export default function StaffDashboard({ user, onLogout }) {
         spo2: patient.spo2 === "" ? "" : String(patient.spo2),
         weight_kg: patient.weightKg === "" ? "" : String(patient.weightKg),
         triage_notes: patient.triageNotes || "",
+        ...(existing || {}),
       };
     },
     [triageDrafts]
@@ -308,7 +357,6 @@ export default function StaffDashboard({ user, onLogout }) {
   const getDoctorDraft = useCallback(
     (patient) => {
       const existing = doctorDrafts[patient.queueId];
-      if (existing) return existing;
       return {
         diagnosis: patient.diagnosis || "",
         prescription: patient.prescription || "",
@@ -316,12 +364,17 @@ export default function StaffDashboard({ user, onLogout }) {
         follow_up_date: patient.followUpDate ? String(patient.followUpDate).slice(0, 16) : "",
         follow_up_notes: patient.followUpNotes || "",
         doctor_notes: patient.doctorNotes || "",
+        ...(existing || {}),
       };
     },
     [doctorDrafts]
   );
 
   const updateTriageDraft = useCallback((queueId, field, value) => {
+    setTriageReadyMap((current) => ({
+      ...current,
+      [queueId]: false,
+    }));
     setTriageDrafts((current) => ({
       ...current,
       [queueId]: {
@@ -332,6 +385,10 @@ export default function StaffDashboard({ user, onLogout }) {
   }, []);
 
   const updateDoctorDraft = useCallback((queueId, field, value) => {
+    setDoctorReadyMap((current) => ({
+      ...current,
+      [queueId]: false,
+    }));
     setDoctorDrafts((current) => ({
       ...current,
       [queueId]: {
@@ -398,6 +455,10 @@ export default function StaffDashboard({ user, onLogout }) {
         delete next[patient.queueId];
         return next;
       });
+      setTriageReadyMap((current) => ({
+        ...current,
+        [patient.queueId]: true,
+      }));
       await loadDashboardData();
     } catch (error) {
       pushToast(error.message || "Unable to save nurse assessment.");
@@ -418,6 +479,10 @@ export default function StaffDashboard({ user, onLogout }) {
         assessed_by_name: user?.name || "Triage Nurse",
       });
       pushToast("Patient marked ready for doctor.");
+      setTriageReadyMap((current) => ({
+        ...current,
+        [patient.queueId]: false,
+      }));
       await loadDashboardData();
     } catch (error) {
       pushToast(error.message || "Unable to mark patient ready for doctor.");
@@ -439,22 +504,54 @@ export default function StaffDashboard({ user, onLogout }) {
         delete next[patient.queueId];
         return next;
       });
+      setDoctorReadyMap((current) => ({
+        ...current,
+        [patient.queueId]: !completeVisit,
+      }));
       await loadDashboardData();
     } catch (error) {
       pushToast(error.message || "Unable to save doctor notes.");
     }
   };
 
-  const runLookup = () => {
-    const query = lookupQuery.trim().toLowerCase();
+  const runLookup = async () => {
+    const query = lookupQuery.trim();
     if (!query) {
       setLookupResult(null);
       return;
     }
-    const byToken = Number(query);
-    const found = patients.find((patient) => patient.token === byToken || patient.name?.toLowerCase().includes(query));
-    setLookupResult(found || null);
-    pushToast(found ? `Patient found: Token #${found.token}` : "No matching patient found.");
+
+    try {
+      const { lookupPatients, normalizePriority } = await import("../../lib/api");
+      const response = await lookupPatients(query);
+      const first = response?.patients?.[0] || null;
+      if (!first) {
+        setLookupResult(null);
+        pushToast("No matching patient found.");
+        return;
+      }
+
+      const latestVisit = first.latestVisit || null;
+      const mapped = {
+        token: latestVisit?.token || "-",
+        name: first.name,
+        department: latestVisit?.department || "-",
+        departmentId: latestVisit?.departmentId || null,
+        mobile: first.mobile || "",
+        priority: normalizePriority(latestVisit?.priorityLevel || 3),
+        queueId: latestVisit?.queueId || null,
+        rawStatus: latestVisit?.queueStatus || "",
+        status: latestVisit?.queueStatus || latestVisit?.appointmentStatus || "-",
+        waitMins: 0,
+        registeredAt: latestVisit?.createdAt
+          ? new Date(latestVisit.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })
+          : "-",
+      };
+      setLookupResult(mapped);
+      pushToast(`Patient found: ${mapped.name}`);
+    } catch (error) {
+      pushToast(error.message || "Unable to run patient lookup.");
+    }
   };
 
   if (screenState === "loading") return <PageShell name={user?.name || "Staff"} clock={clock}><StateCard title="Loading staff console" description="Fetching queue status and patient records from the backend." /></PageShell>;
@@ -561,7 +658,7 @@ export default function StaffDashboard({ user, onLogout }) {
         {activeTab === "lookup" ? (
           <section style={{ marginTop: 10 }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <input value={lookupQuery} onChange={(event) => setLookupQuery(event.target.value)} onKeyDown={(event) => (event.key === "Enter" ? runLookup() : null)} placeholder="Search by token or patient name" style={{ flex: 1, border: "1px solid #CBD5E1", borderRadius: 8, padding: "10px 12px", fontSize: 14, outline: "none" }} />
+              <input value={lookupQuery} onChange={(event) => setLookupQuery(event.target.value)} onKeyDown={(event) => (event.key === "Enter" ? runLookup() : null)} placeholder="Search by patient id, mobile, token, or name" style={{ flex: 1, border: "1px solid #CBD5E1", borderRadius: 8, padding: "10px 12px", fontSize: 14, outline: "none" }} />
               <button type="button" onClick={runLookup} style={{ border: "none", borderRadius: 8, background: COLORS.navy, color: "#fff", fontWeight: 700, padding: "10px 14px", cursor: "pointer" }}>Search</button>
             </div>
 
@@ -675,6 +772,7 @@ export default function StaffDashboard({ user, onLogout }) {
                       (() => {
                         const patient = selectedTriagePatient;
                         const draft = getTriageDraft(patient);
+                        const triageReady = Boolean(triageReadyMap[patient.queueId] || patient.assessedAt);
                         return (
                           <section style={{ display: "grid", gap: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -698,24 +796,24 @@ export default function StaffDashboard({ user, onLogout }) {
 
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(90px, 1fr))", gap: 8 }}>
                               <label style={fieldLabel}>
-                                <span>Temp</span>
-                                <input value={draft.temperature_c} onChange={(event) => updateTriageDraft(patient.queueId, "temperature_c", event.target.value)} placeholder="98.6" style={fieldInputCompact} />
+                                <span>Temp (F)</span>
+                                <input value={draft.temperature_c ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "temperature_c", event.target.value)} placeholder="98.6" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
                                 <span>BP</span>
-                                <input value={draft.blood_pressure} onChange={(event) => updateTriageDraft(patient.queueId, "blood_pressure", event.target.value)} placeholder="120/80" style={fieldInputCompact} />
+                                <input value={draft.blood_pressure ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "blood_pressure", event.target.value)} placeholder="120/80" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
                                 <span>Pulse</span>
-                                <input value={draft.pulse_rate} onChange={(event) => updateTriageDraft(patient.queueId, "pulse_rate", event.target.value)} placeholder="72" style={fieldInputCompact} />
+                                <input value={draft.pulse_rate ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "pulse_rate", event.target.value)} placeholder="72" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
                                 <span>SpO2</span>
-                                <input value={draft.spo2} onChange={(event) => updateTriageDraft(patient.queueId, "spo2", event.target.value)} placeholder="98" style={fieldInputCompact} />
+                                <input value={draft.spo2 ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "spo2", event.target.value)} placeholder="98" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
                                 <span>Weight</span>
-                                <input value={draft.weight_kg} onChange={(event) => updateTriageDraft(patient.queueId, "weight_kg", event.target.value)} placeholder="60" style={fieldInputCompact} />
+                                <input value={draft.weight_kg ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "weight_kg", event.target.value)} placeholder="60" style={fieldInputCompact} />
                               </label>
                             </div>
 
@@ -726,8 +824,13 @@ export default function StaffDashboard({ user, onLogout }) {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                               <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
-                              <button type="button" onClick={() => saveTriage(patient)} style={btnPrimary}>Save Triage</button>
-                              <button type="button" onClick={() => markReady(patient)} style={{ ...btnPrimary, background: COLORS.green }}>Ready For Doctor</button>
+                              <button
+                                type="button"
+                                onClick={() => (triageReady ? markReady(patient) : saveTriage(patient))}
+                                style={{ ...btnPrimary, background: triageReady ? COLORS.green : COLORS.navy }}
+                              >
+                                {triageReady ? "Ready For Doctor" : "Save Triage"}
+                              </button>
                               {patient.urgentReviewRequested ? (
                                 <>
                                   <button type="button" onClick={() => approvePriority(patient.queueId, 2)} style={{ ...btnPrimary, background: "#D97706" }}>Mark High</button>
@@ -806,6 +909,27 @@ export default function StaffDashboard({ user, onLogout }) {
                     (() => {
                       const patient = selectedDoctorPatient;
                       const draft = getDoctorDraft(patient);
+                      const doctorReady = Boolean(doctorReadyMap[patient.queueId] || patient.consultedAt);
+                      const caseData = doctorCaseMap[patient.queueId] || null;
+                      const patientProfile = caseData?.patient || null;
+                      const previousVisit = Array.isArray(caseData?.visitHistory) ? caseData.visitHistory.find((visit) => visit.appointmentId !== patient.appointmentId) : null;
+                      const flags = buildClinicalFlags({
+                        temperatureF: toNullableNumber(patient.temperatureC),
+                        pulseRate: toNullableNumber(patient.pulseRate),
+                        spo2: toNullableNumber(patient.spo2),
+                        painScale: patient.painScale,
+                      });
+                      const summaryText = [
+                        `Patient: ${patient.name} (${patient.age}/${patientProfile?.gender || "-"})`,
+                        `Token: #${patient.token} | Dept: ${patient.department}`,
+                        `Symptoms: ${patient.symptoms || "-"}`,
+                        `Current Vitals: Temp ${patient.temperatureC || "-"} F, BP ${patient.bloodPressure || "-"}, Pulse ${patient.pulseRate || "-"}, SpO2 ${patient.spo2 || "-"}, Weight ${patient.weightKg || "-"} kg`,
+                        `Allergies: ${patientProfile?.allergies || "-"}`,
+                        `Chronic Conditions: ${patientProfile?.chronicConditions || "-"}`,
+                        `Previous Diagnosis: ${previousVisit?.doctor?.diagnosis || "-"}`,
+                        `Previous Prescription: ${previousVisit?.doctor?.prescription || "-"}`,
+                        `Previous Visit Date: ${previousVisit?.createdAt ? new Date(previousVisit.createdAt).toLocaleDateString("en-IN") : "-"}`,
+                      ].join("\n");
                       return (
                         <section style={{ display: "grid", gap: 10 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -821,9 +945,39 @@ export default function StaffDashboard({ user, onLogout }) {
                             </div>
                           </div>
 
+                          <section style={{ border: "1px solid #DBEAFE", background: "#EFF6FF", borderRadius: 10, padding: 10, display: "grid", gap: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <strong style={{ color: COLORS.navy }}>Clinical Snapshot</strong>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(summaryText);
+                                    pushToast("Clinical summary copied.");
+                                  } catch (_error) {
+                                    pushToast("Unable to copy summary.");
+                                  }
+                                }}
+                                style={{ ...btnGhost, padding: "6px 10px", fontSize: 12 }}
+                              >
+                                Copy Clinical Summary
+                              </button>
+                            </div>
+                            {doctorCaseLoading ? <div style={{ fontSize: 12, color: "#475569" }}>Loading profile and history...</div> : null}
+                            <div style={{ display: "grid", gap: 6, fontSize: 13, color: "#0F172A" }}>
+                              <div><strong>Age / Gender:</strong> {patient.age} / {patientProfile?.gender || "-"}</div>
+                              <div><strong>Allergies:</strong> {patientProfile?.allergies || "-"}</div>
+                              <div><strong>Conditions:</strong> {patientProfile?.chronicConditions || "-"}</div>
+                              <div><strong>Last Dx:</strong> {previousVisit?.doctor?.diagnosis || "-"}</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {flags.length ? flags.map((flag) => <FlagPill key={flag.label} tone={flag.tone} label={flag.label} />) : <span style={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>No immediate red flags from triage values.</span>}
+                            </div>
+                          </section>
+
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(160px, 1fr))", gap: 8 }}>
                             <InfoBox label="Symptoms" value={patient.symptoms || "See full case for details"} />
-                            <InfoBox label="Vitals" value={`${patient.temperatureC || "-"} C | BP ${patient.bloodPressure || "-"} | Pulse ${patient.pulseRate || "-"}`} />
+                            <InfoBox label="Vitals" value={`${patient.temperatureC || "-"} F | BP ${patient.bloodPressure || "-"} | Pulse ${patient.pulseRate || "-"}`} />
                             <InfoBox label="Triage Notes" value={patient.triageNotes || "No nurse note yet"} />
                             <InfoBox label="History" value="Use Open Full Case for past consultations and profile history" />
                           </div>
@@ -853,8 +1007,13 @@ export default function StaffDashboard({ user, onLogout }) {
 
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                             <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
-                            <button type="button" onClick={() => saveDoctorWork(patient, false)} style={btnPrimary}>Save Notes</button>
-                            <button type="button" onClick={() => saveDoctorWork(patient, true)} style={{ ...btnPrimary, background: COLORS.green }}>Complete Visit</button>
+                            <button
+                              type="button"
+                              onClick={() => (doctorReady ? saveDoctorWork(patient, true) : saveDoctorWork(patient, false))}
+                              style={{ ...btnPrimary, background: doctorReady ? COLORS.green : COLORS.navy }}
+                            >
+                              {doctorReady ? "Complete Visit" : "Save Consultation"}
+                            </button>
                           </div>
 
                           {patient.consultedAt ? (
@@ -983,6 +1142,12 @@ function KpiCard({ value, label, color }) { return <div style={{ background: "#f
 function Card({ title, count, countColor, children }) { return <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#fff" }}><div style={{ background: COLORS.navy, color: "#fff", padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><strong>{title}</strong>{typeof count === "number" ? <span style={{ background: "#fff", color: countColor || COLORS.navy, borderRadius: 999, padding: "2px 8px", fontSize: 12, fontWeight: 900 }}>{count}</span> : null}</div><div style={{ padding: 10 }}>{children}</div></section>; }
 function MiniStat({ title, value }) { return <div style={{ border: "1px solid rgba(255,255,255,.25)", borderRadius: 8, padding: "8px 9px" }}><div style={{ fontSize: 11, color: COLORS.saffron }}>{title}</div><div style={{ fontSize: 14, fontWeight: 900, color: COLORS.skyText, marginTop: 2 }}>{value}</div></div>; }
 function PriorityPill({ priority }) { const tone = priority === "critical" ? { bg: "#FEE2E2", color: "#B91C1C", label: "Critical" } : priority === "high" ? { bg: "#FEF3C7", color: "#B45309", label: "High" } : { bg: "#DCFCE7", color: "#166534", label: "Normal" }; return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>; }
+function FlagPill({ tone, label }) {
+  const palette = tone === "critical"
+    ? { bg: "#FEE2E2", color: "#B91C1C" }
+    : { bg: "#FEF3C7", color: "#92400E" };
+  return <span style={{ background: palette.bg, color: palette.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 800 }}>{label}</span>;
+}
 function ReviewFlagPill() { return <span style={{ background: "#FEF3C7", color: "#B45309", borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>Needs Review</span>; }
 function AppointmentStatusPill({ status }) {
   const tone = status === "ready-for-doctor"

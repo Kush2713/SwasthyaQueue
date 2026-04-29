@@ -68,6 +68,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const [queueRows, setQueueRows] = useState([]);
   const [query, setQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
+  const [lookupMatches, setLookupMatches] = useState([]);
   const [activeDepartment, setActiveDepartment] = useState("All");
   const [urgentForm, setUrgentForm] = useState({ queueId: null, reason: "" });
   const [assistedForm, setAssistedForm] = useState({
@@ -109,6 +110,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
           id: patient.queue_id,
           queueId: patient.queue_id,
           token: patient.token_number,
+          tokenLabel: patient.token_label || null,
           patientId: patient.patient_id,
           name: patient.name,
           age: patient.age ?? "-",
@@ -133,7 +135,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
         const rows = flattenedQueue.filter((patient) => patient.departmentId === department.department_id);
         const waiting = rows.filter((patient) => patient.rawStatus === "waiting").length;
         const active = rows.find((patient) => patient.rawStatus === "in-progress");
-        const nowServing = active?.token || rows[0]?.token || "-";
+        const nowServing = active?.tokenLabel || (active?.token ? `#${active.token}` : null) || rows[0]?.tokenLabel || (rows[0]?.token ? `#${rows[0].token}` : "-");
         const etaForNewToken = waiting * department.avg_consult_time;
         return {
           ...department,
@@ -168,8 +170,15 @@ export default function ReceptionDashboard({ user, onLogout }) {
     if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadReceptionData();
-    }, 15000);
-    return () => clearInterval(timer);
+    }, 20000);
+    const onFocus = () => {
+      loadReceptionData();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [screenState, loadReceptionData]);
 
   const receptionistStats = useMemo(() => {
@@ -191,22 +200,52 @@ export default function ReceptionDashboard({ user, onLogout }) {
     return queueRows.filter((row) => row.department === activeDepartment);
   }, [queueRows, activeDepartment]);
 
-  const runLookup = () => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const runLookup = async () => {
+    const normalizedQuery = query.trim();
     if (!normalizedQuery) {
       setLookupResult(null);
+      setLookupMatches([]);
       return;
     }
 
-    const numericToken = Number(normalizedQuery);
-    const normalizedMobileQuery = normalizeMobile(normalizedQuery);
-    const found = queueRows.find((row) =>
-      row.token === numericToken ||
-      row.name?.toLowerCase().includes(normalizedQuery) ||
-      normalizeMobile(row.mobile).includes(normalizedMobileQuery)
-    );
+    try {
+      const { lookupPatients, normalizePriority } = await import("../../lib/api");
+      const response = await lookupPatients(normalizedQuery);
+      const mappedMatches = (response?.patients || []).map((patient) => {
+        const latestVisit = patient.latestVisit || null;
+        const activeQueueRow = latestVisit?.queueId
+          ? queueRows.find((row) => row.queueId === latestVisit.queueId)
+          : null;
 
-    setLookupResult(found || null);
+        return {
+          queueId: latestVisit?.queueId || null,
+          token: latestVisit?.token || "-",
+          tokenLabel: activeQueueRow?.tokenLabel || null,
+          patientId: patient.patientId,
+          name: patient.name,
+          age: patient.age ?? "-",
+          mobile: patient.mobile ?? "",
+          department: latestVisit?.department || "-",
+          departmentId: latestVisit?.departmentId || null,
+          priority: activeQueueRow ? activeQueueRow.priority : normalizePriority(latestVisit?.priorityLevel || 3),
+          priorityLevel: latestVisit?.priorityLevel || null,
+          waitMins: activeQueueRow?.waitMins ?? 0,
+          peopleAhead: activeQueueRow?.peopleAhead ?? 0,
+          status: activeQueueRow?.status || normalizeStatus(latestVisit?.queueStatus || latestVisit?.appointmentStatus || "No Active Queue"),
+          rawStatus: activeQueueRow?.rawStatus || latestVisit?.queueStatus || "",
+          registeredAt: latestVisit?.createdAt ? formatDateTime(latestVisit.createdAt) : "-",
+          preferredSlot: latestVisit?.preferredSlot ? formatDateTime(latestVisit.preferredSlot) : "-",
+          hasActiveQueue: Boolean(patient.hasActiveQueue),
+        };
+      });
+
+      setLookupMatches(mappedMatches);
+      setLookupResult(mappedMatches[0] || null);
+    } catch (err) {
+      setLoadError(err.message || "Unable to search patients right now.");
+      setLookupMatches([]);
+      setLookupResult(null);
+    }
   };
 
   const submitUrgentReview = async (queueId) => {
@@ -372,12 +411,17 @@ export default function ReceptionDashboard({ user, onLogout }) {
             </div>
 
             <div style={{ marginTop: 12 }}>
+              {lookupMatches.length > 1 ? (
+                <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8 }}>
+                  {lookupMatches.length} matches found. Showing top-ranked patient.
+                </div>
+              ) : null}
               {lookupResult ? (
                 <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, background: "#F8FAFC", padding: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 18 }}>{lookupResult.name}</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>Token #{lookupResult.token} | Patient ID {lookupResult.patientId}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>{lookupResult.tokenLabel || `Token #${lookupResult.token}`} | Patient ID {lookupResult.patientId}</div>
                     </div>
                     <PriorityPill priority={lookupResult.priority} />
                   </div>
@@ -390,7 +434,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
                     <InfoBox label="Preferred Slot" value={lookupResult.preferredSlot} />
                   </div>
                   <div style={{ marginTop: 10, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: "10px 12px", fontSize: 13 }}>
-                    Front desk answer: Token #{lookupResult.token} in {lookupResult.department} currently has about {lookupResult.waitMins} minute(s) to go.
+                    Front desk answer: {lookupResult.tokenLabel || `Token #${lookupResult.token}`} in {lookupResult.department} currently has about {lookupResult.waitMins} minute(s) to go.
                   </div>
                   {lookupResult.rawStatus === "waiting" ? (
                     <div style={{ marginTop: 10 }}>
@@ -399,11 +443,13 @@ export default function ReceptionDashboard({ user, onLogout }) {
                       </button>
                     </div>
                   ) : null}
-                  <div style={{ marginTop: 10 }}>
-                    <button type="button" onClick={() => navigate(`/case/queue/${lookupResult.queueId}`)} style={btnGhost}>
-                      Open Patient Case
-                    </button>
-                  </div>
+                  {lookupResult.queueId ? (
+                    <div style={{ marginTop: 10 }}>
+                      <button type="button" onClick={() => navigate(`/case/queue/${lookupResult.queueId}`)} style={btnGhost}>
+                        Open Patient Case
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -646,10 +692,21 @@ function Notice({ tone, text }) {
 
 function DepartmentCard({ department, active, onSelect, onCallNext }) {
   return (
-        <button type="button" onClick={onSelect} style={{ border: `1px solid ${department.color.accent}`, background: department.color.soft, borderRadius: 12, padding: 12, textAlign: "left", cursor: "pointer", boxShadow: active ? `0 0 0 2px ${department.color.accent}55` : "none", minHeight: 210, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <section
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        style={{ border: `1px solid ${department.color.accent}`, background: department.color.soft, borderRadius: 12, padding: 12, textAlign: "left", cursor: "pointer", boxShadow: active ? `0 0 0 2px ${department.color.accent}55` : "none", minHeight: 210, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+      >
         <div style={{ minHeight: 66, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
           <div style={{ fontWeight: 800, color: department.color.accent, fontSize: 13, lineHeight: 1.3, maxWidth: "62%" }}>{department.name}</div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#334155", minWidth: 54, textAlign: "right", lineHeight: 1.3 }}>Now #{department.nowServing}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#334155", minWidth: 54, textAlign: "right", lineHeight: 1.3 }}>Now {department.nowServing}</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(80px, 1fr))", gap: 8 }}>
           <InfoBox label="Waiting" value={department.waiting} />
@@ -660,7 +717,7 @@ function DepartmentCard({ department, active, onSelect, onCallNext }) {
             Call Next
           </button>
         </div>
-      </button>
+      </section>
   );
 }
 
@@ -744,7 +801,7 @@ const btnPrimary = { border: "none", borderRadius: 8, background: COLORS.navy, c
 const btnGhost = { border: "1px solid #CBD5E1", borderRadius: 8, background: "#fff", color: "#334155", fontWeight: 700, padding: "10px 14px", cursor: "pointer" };
 const inputStyle = { width: "100%", border: "1px solid #CBD5E1", borderRadius: 8, padding: "10px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" };
 const chipStyle = { border: "1px solid #CBD5E1", borderRadius: 999, background: "#fff", color: "#334155", fontWeight: 700, padding: "6px 10px", cursor: "pointer", fontSize: 12 };
-const activeChipStyle = { background: COLORS.navy, color: "#fff", borderColor: COLORS.navy };
+const activeChipStyle = { background: COLORS.navy, color: "#fff", border: `1px solid ${COLORS.navy}` };
 
 function Field({ label, children }) {
   return <label style={{ display: "block" }}><span style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 700, color: "#334155" }}>{label}</span>{children}</label>;

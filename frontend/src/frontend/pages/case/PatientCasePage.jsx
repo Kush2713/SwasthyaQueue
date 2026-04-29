@@ -279,8 +279,8 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                     {triageState.error ? <Notice tone="warn" text={triageState.error} /> : null}
                     {triageState.message ? <Notice tone="info" text={triageState.message} /> : null}
                     <FormGrid>
-                      <Field label="Temperature (C)">
-                        <input value={triageDraft.temperature_c} onChange={(event) => setTriageDraft((current) => ({ ...current, temperature_c: event.target.value }))} style={fieldInput} />
+                      <Field label="Temperature (F)">
+                        <input value={triageDraft.temperature_c ?? ""} onChange={(event) => setTriageDraft((current) => ({ ...current, temperature_c: event.target.value }))} style={fieldInput} />
                       </Field>
                       <Field label="Blood Pressure">
                         <input value={triageDraft.blood_pressure} onChange={(event) => setTriageDraft((current) => ({ ...current, blood_pressure: event.target.value }))} style={fieldInput} />
@@ -307,7 +307,7 @@ export default function PatientCasePage({ queueId, user, onBack }) {
                 ) : (
                   <DetailGrid
                     items={[
-                      ["Temperature", caseData.currentVisit.triage.temperatureC ? `${caseData.currentVisit.triage.temperatureC} C` : "-"],
+                      ["Temperature", caseData.currentVisit.triage.temperatureC ? `${caseData.currentVisit.triage.temperatureC} F` : "-"],
                       ["Blood Pressure", caseData.currentVisit.triage.bloodPressure || "-"],
                       ["Pulse", caseData.currentVisit.triage.pulseRate || "-"],
                       ["SpO2", caseData.currentVisit.triage.spo2 || "-"],
