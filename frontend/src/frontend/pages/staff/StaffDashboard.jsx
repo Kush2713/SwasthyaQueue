@@ -131,6 +131,7 @@ export default function StaffDashboard({ user, onLogout }) {
           departmentId: department.department_id,
           priority: normalizePriority(patient.priority_level),
           priorityLevel: patient.priority_level,
+          priorityHumanConfirmed: Boolean(patient.priority_human_confirmed),
           appointmentStatus: patient.appointment_status || "queued",
           symptoms: patient.symptoms || "",
           waitMins: patient.estimated_wait_time ?? 0,
@@ -197,14 +198,21 @@ export default function StaffDashboard({ user, onLogout }) {
     if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadDashboardData();
-    }, 20000);
+    }, 10000);
     const onFocus = () => {
       loadDashboardData();
     };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadDashboardData();
+      }
+    };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [screenState, loadDashboardData]);
 
@@ -254,17 +262,25 @@ export default function StaffDashboard({ user, onLogout }) {
   const triagePatients = useMemo(
     () =>
       patients
-        .filter((patient) => patient.rawStatus === "waiting" || patient.rawStatus === "in-progress")
+        .filter((patient) => (patient.rawStatus === "waiting" || patient.rawStatus === "in-progress") && patient.appointmentStatus !== "ready-for-doctor")
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
+    [patients]
+  );
+
+  const assessedTodayPatients = useMemo(
+    () =>
+      patients
+        .filter((patient) => Boolean(patient.assessedAt) && patient.appointmentStatus === "ready-for-doctor")
+        .sort((a, b) => (new Date(b.assessedAt).getTime() || 0) - (new Date(a.assessedAt).getTime() || 0)),
     [patients]
   );
 
   const nurseStats = useMemo(() => {
     const waitingTriage = triagePatients.filter((patient) => patient.rawStatus === "waiting").length;
-    const assessed = triagePatients.filter((patient) => patient.assessedAt).length;
+    const assessed = assessedTodayPatients.length;
     const urgent = urgentReviewPatients.length;
     return { waitingTriage, assessed, urgent };
-  }, [triagePatients, urgentReviewPatients]);
+  }, [triagePatients, assessedTodayPatients, urgentReviewPatients]);
 
   useEffect(() => {
     if (!isNurse) return;
@@ -533,7 +549,9 @@ export default function StaffDashboard({ user, onLogout }) {
 
       const latestVisit = first.latestVisit || null;
       const mapped = {
+        patientId: first.patientId,
         token: latestVisit?.token || "-",
+        tokenLabel: latestVisit?.tokenLabel || "",
         name: first.name,
         department: latestVisit?.department || "-",
         departmentId: latestVisit?.departmentId || null,
@@ -546,6 +564,7 @@ export default function StaffDashboard({ user, onLogout }) {
         registeredAt: latestVisit?.createdAt
           ? new Date(latestVisit.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })
           : "-",
+        visitHistory: first.visitHistory || [],
       };
       setLookupResult(mapped);
       pushToast(`Patient found: ${mapped.name}`);
@@ -554,14 +573,28 @@ export default function StaffDashboard({ user, onLogout }) {
     }
   };
 
-  if (screenState === "loading") return <PageShell name={user?.name || "Staff"} clock={clock}><StateCard title="Loading staff console" description="Fetching queue status and patient records from the backend." /></PageShell>;
-  if (screenState === "error") return <PageShell name={user?.name || "Staff"} clock={clock}><StateCard title="Unable to load console" description={loadError} actionLabel="Try Again" onAction={loadDashboardData} /></PageShell>;
-  if (screenState === "empty") return <PageShell name={user?.name || "Staff"} clock={clock}><StateCard title="No patients in queue" description="Registrations and queue activity will appear here once patients are added." actionLabel="Refresh Data" onAction={loadDashboardData} /></PageShell>;
+  const confirmPriority = async (patient) => {
+    try {
+      const { confirmQueuePriority } = await import("../../lib/api");
+      const result = await confirmQueuePriority(patient.queueId, {
+        priority_level: patient.priorityLevel || 3,
+        note: `Confirmed by ${user?.name || "Nurse"}`,
+      });
+      pushToast(result.message || "Priority confirmed.");
+      await loadDashboardData();
+    } catch (error) {
+      pushToast(error.message || "Unable to confirm priority.");
+    }
+  };
+
+  if (screenState === "loading") return <PageShell name={user?.name || "Staff"} clock={clock} role={user?.role}><StateCard title="Loading staff console" description="Fetching queue status and patient records from the backend." /></PageShell>;
+  if (screenState === "error") return <PageShell name={user?.name || "Staff"} clock={clock} role={user?.role}><StateCard title="Unable to load console" description={loadError} actionLabel="Try Again" onAction={loadDashboardData} /></PageShell>;
+  if (screenState === "empty") return <PageShell name={user?.name || "Staff"} clock={clock} role={user?.role}><StateCard title="No patients in queue" description="Registrations and queue activity will appear here once patients are added." actionLabel="Refresh Data" onAction={loadDashboardData} /></PageShell>;
 
   return (
     <div style={{ minHeight: "100vh", background: COLORS.pageBg }}>
       <TricolorStrip />
-      <GovHeader name={user?.name || "Staff"} clock={clock} />
+      <GovHeader name={user?.name || "Staff"} clock={clock} role={user?.role} />
 
       <main style={{ maxWidth: 880, margin: "0 auto", padding: "14px 12px 24px" }}>
         <section style={{ background: COLORS.navy, color: "#fff", borderRadius: 12, padding: 12, marginBottom: 12 }}>
@@ -666,10 +699,11 @@ export default function StaffDashboard({ user, onLogout }) {
               <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
                 <div style={{ background: COLORS.navy, color: "#fff", padding: "10px 12px", display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <strong>{lookupResult.name}</strong>
-                  <div style={{ color: COLORS.skyText, fontSize: 12 }}>Token #{lookupResult.token} | {lookupResult.department}</div>
+                  <div style={{ color: COLORS.skyText, fontSize: 12 }}>{lookupResult.tokenLabel || `Token #${lookupResult.token}`} | {lookupResult.department}</div>
                   <PriorityPill priority={lookupResult.priority} />
                 </div>
                 <div style={{ padding: 10, display: "grid", gridTemplateColumns: "repeat(2, minmax(160px,1fr))", gap: 8 }}>
+                  <InfoBox label="Patient ID" value={lookupResult.patientId || "-"} />
                   <InfoBox label="Queue ID" value={lookupResult.queueId} />
                   <InfoBox label="Department" value={lookupResult.department} />
                   <InfoBox label="Priority" value={lookupResult.priority} />
@@ -678,8 +712,33 @@ export default function StaffDashboard({ user, onLogout }) {
                   <InfoBox label="Registered At" value={lookupResult.registeredAt} />
                 </div>
                 <div style={{ padding: "0 10px 10px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {lookupResult.queueId ? <button type="button" onClick={() => navigate(`/case/queue/${lookupResult.queueId}`)} style={btnGhost}>Open Current Case</button> : null}
                   {lookupResult.rawStatus === "waiting" ? <button type="button" onClick={() => callIn(lookupResult.departmentId)} style={btnPrimary}>Call Next In Department</button> : null}
                   {lookupResult.rawStatus === "in-progress" ? <button type="button" onClick={() => complete(lookupResult.queueId)} style={{ ...btnPrimary, background: COLORS.green }}>Complete</button> : null}
+                </div>
+                <div style={{ padding: "0 10px 10px" }}>
+                  <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 10 }}>
+                    <strong style={{ fontSize: 13, color: "#0F172A" }}>Visit History</strong>
+                    {lookupResult.visitHistory?.length ? (
+                      <div style={{ marginTop: 8, display: "grid", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                        {lookupResult.visitHistory.map((visit) => (
+                          <div key={`lookup-visit-${visit.appointmentId}`} style={{ border: "1px solid #E2E8F0", borderRadius: 8, background: "#F8FAFC", padding: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
+                              <strong>{visit.department}</strong>
+                              <span style={{ color: "#475569" }}>{visit.tokenLabel || "-"}</span>
+                            </div>
+                            <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>
+                              {visit.createdAt ? new Date(visit.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) : "-"} | {visit.queueStatus || visit.appointmentStatus || "-"}
+                            </div>
+                            <div style={{ marginTop: 4, fontSize: 12, color: "#334155" }}>{visit.symptoms || "No symptoms recorded"}</div>
+                            {visit.diagnosis ? <div style={{ marginTop: 4, fontSize: 12, color: "#0F172A" }}><strong>Dx:</strong> {visit.diagnosis}</div> : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 6, fontSize: 12, color: "#64748B" }}>No previous visits found for this patient.</div>
+                    )}
+                  </div>
                 </div>
               </section>
             ) : (
@@ -692,8 +751,8 @@ export default function StaffDashboard({ user, onLogout }) {
           <section style={{ marginTop: 10, display: "grid", gap: 10 }}>
             {user?.role === "nurse" ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 10, alignItems: "start" }}>
-                  <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 10, alignItems: "start" }}>
+                    <div style={{ display: "grid", gap: 10 }}>
                     <Card title="Urgent Review" count={urgentReviewPatients.length} countColor="#DC2626">
                       {urgentReviewPatients.length ? (
                         <div style={{ display: "grid", gap: 8 }}>
@@ -765,6 +824,40 @@ export default function StaffDashboard({ user, onLogout }) {
                         <InlineEmpty title="No patients waiting for triage" description="New quick-intake or booked patients will appear here." />
                       )}
                     </Card>
+
+                    <Card title="Assessed Today" count={assessedTodayPatients.length}>
+                      {assessedTodayPatients.length ? (
+                        <div style={{ display: "grid", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                          {assessedTodayPatients.map((patient) => (
+                            <button
+                              key={`assessed-${patient.queueId}`}
+                              type="button"
+                              onClick={() => setSelectedTriageQueueId(patient.queueId)}
+                              style={{
+                                border: "1px solid #E2E8F0",
+                                borderRadius: 10,
+                                padding: 10,
+                                background: "#F8FAFC",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                display: "grid",
+                                gap: 5,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                <strong style={{ color: COLORS.navy }}>#{patient.token} | {patient.name}</strong>
+                                <AppointmentStatusPill status={patient.appointmentStatus} />
+                              </div>
+                              <div style={{ fontSize: 12, color: "#64748B" }}>
+                                {patient.department} | Assessed {new Date(patient.assessedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <InlineEmpty title="No assessed handoffs yet" description="Patients marked ready for doctor will appear here." />
+                      )}
+                    </Card>
                   </div>
 
                   <Card title={selectedTriagePatient ? "Triage Workspace" : "Triage Workspace"} count={selectedTriagePatient ? selectedTriagePatient.token : undefined}>
@@ -824,6 +917,9 @@ export default function StaffDashboard({ user, onLogout }) {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                               <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
+                              <button type="button" onClick={() => confirmPriority(patient)} style={{ ...btnGhost, borderColor: "#2563EB", color: "#1D4ED8" }}>
+                                {patient.priorityHumanConfirmed ? "Priority Confirmed" : "Confirm Priority"}
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => (triageReady ? markReady(patient) : saveTriage(patient))}
@@ -853,11 +949,7 @@ export default function StaffDashboard({ user, onLogout }) {
                   </Card>
                 </div>
               </>
-            ) : (
-              <section style={{ border: "1px solid #CBD5E1", background: "#fff", borderRadius: 10, padding: "10px 12px", fontSize: 13, lineHeight: 1.6 }}>
-                Nurse triage is visible only to the nurse role. Reception can flag urgent review, and doctors should focus on consultation and queue movement.
-              </section>
-            )}
+            ) : null}
           </section>
         ) : null}
 
@@ -1108,8 +1200,8 @@ const btnPrimary = { border: "none", borderRadius: 8, background: COLORS.navy, c
 const btnGhost = { border: "1px solid #CBD5E1", borderRadius: 8, background: "#fff", color: "#334155", fontWeight: 700, padding: "9px 12px", cursor: "pointer" };
 const h3 = { margin: "0 0 8px", color: COLORS.navy, fontSize: 16 };
 
-function PageShell({ name, clock, children }) {
-  return <div style={{ minHeight: "100vh", background: COLORS.pageBg }}><TricolorStrip /><GovHeader name={name} clock={clock} /><main style={{ maxWidth: 880, margin: "0 auto", padding: "14px 12px 24px" }}>{children}</main><GovFooter /></div>;
+function PageShell({ name, clock, role, children }) {
+  return <div style={{ minHeight: "100vh", background: COLORS.pageBg }}><TricolorStrip /><GovHeader name={name} clock={clock} role={role} /><main style={{ maxWidth: 880, margin: "0 auto", padding: "14px 12px 24px" }}>{children}</main><GovFooter /></div>;
 }
 
 function StateCard({ title, description, actionLabel, onAction }) {
@@ -1164,5 +1256,8 @@ const fieldLabel = { display: "grid", gap: 5, fontSize: 12, fontWeight: 700, col
 const fieldInput = { border: "1px solid #CBD5E1", borderRadius: 8, padding: "9px 10px", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
 const fieldInputCompact = { ...fieldInput, padding: "8px 9px", fontSize: 12 };
 function TricolorStrip() { return <div style={{ display: "flex", height: 5 }}><div style={{ flex: 1, background: COLORS.saffron }} /><div style={{ flex: 1, background: "#fff" }} /><div style={{ flex: 1, background: COLORS.green }} /></div>; }
-function GovHeader({ name, clock }) { return <header style={{ background: COLORS.navyDark, color: "#fff", padding: "10px 12px" }}><div style={{ maxWidth: 960, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>SQ</div><div><div style={{ fontWeight: 800, fontSize: 18 }}>SwasthyaQueue</div><div style={{ color: COLORS.skyText, fontSize: 12 }}>Staff Console | Current Backend API</div></div></div><div style={{ fontSize: 12, color: COLORS.skyText, fontWeight: 700 }}>{name} | {clock}</div></div></header>; }
+function GovHeader({ name, clock, role }) {
+  const subtitle = role === "nurse" ? "Nurse Console" : role === "doctor" ? "Doctor Console" : "Staff Console";
+  return <header style={{ background: COLORS.navyDark, color: "#fff", padding: "10px 12px" }}><div style={{ maxWidth: 960, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>SQ</div><div><div style={{ fontWeight: 800, fontSize: 18 }}>SwasthyaQueue</div><div style={{ color: COLORS.skyText, fontSize: 12 }}>{subtitle}</div></div></div><div style={{ fontSize: 12, color: COLORS.skyText, fontWeight: 700 }}>{name} | {clock}</div></div></header>;
+}
 function GovFooter() { return <footer style={{ background: COLORS.navyDark, color: COLORS.skyText, fontSize: 12, padding: "10px 12px" }}><div style={{ maxWidth: 960, margin: "0 auto", textAlign: "center" }}>Copyright 2026 SwasthyaQueue | Government Hospital OPD Digital Queue System</div></footer>; }

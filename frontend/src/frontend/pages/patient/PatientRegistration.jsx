@@ -113,7 +113,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     age: user?.age ? String(user.age) : "",
     gender: user?.gender || "",
     address: user?.address || "",
-    emergencyContact: user?.emergencyContact || "",
     bloodGroup: user?.bloodGroup || "",
     allergies: user?.allergies || "",
     chronicConditions: user?.chronicConditions || "",
@@ -196,8 +195,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 120) return "Patient profile age is missing or invalid.";
     if (!form.gender) return "Patient profile gender is missing.";
     if (!isValidIndianMobile(form.mobile)) return "Patient mobile number is missing or invalid.";
-    if (!normalizeIndianMobile(form.emergencyContact)) return "Emergency contact is required in the saved profile.";
-    if (!isValidIndianMobile(form.emergencyContact)) return "Emergency contact in the saved profile is invalid. Please update it before booking.";
     return "";
   };
 
@@ -251,7 +248,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
           mobile: normalizeIndianMobile(form.mobile),
           email: user?.email || null,
           address: form.address?.trim() || null,
-          emergencyContact: form.emergencyContact?.trim() || null,
+          emergencyContact: normalizeIndianMobile(form.mobile),
           bloodGroup: form.bloodGroup?.trim() || null,
           allergies: form.allergies?.trim() || null,
           chronicConditions: form.chronicConditions?.trim() || null,
@@ -328,11 +325,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
       setError("Please enter a valid patient mobile number.");
       return;
     }
-    if (!isValidIndianMobile(form.emergencyContact)) {
-      setError("Please enter a valid emergency contact number.");
-      return;
-    }
-
     setProfileSaving(true);
     setProfileNotice("");
     setError("");
@@ -346,7 +338,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
         mobile: normalizeIndianMobile(form.mobile),
         email: user?.email || null,
         address: form.address?.trim() || null,
-        emergencyContact: normalizeIndianMobile(form.emergencyContact),
+        emergencyContact: normalizeIndianMobile(form.mobile),
         bloodGroup: form.bloodGroup?.trim() || null,
         allergies: form.allergies?.trim() || null,
         chronicConditions: form.chronicConditions?.trim() || null,
@@ -361,7 +353,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
         gender: form.gender,
         mobile: normalizeIndianMobile(form.mobile),
         address: form.address?.trim() || null,
-        emergencyContact: normalizeIndianMobile(form.emergencyContact),
+        emergencyContact: normalizeIndianMobile(form.mobile),
         bloodGroup: form.bloodGroup?.trim() || null,
         allergies: form.allergies?.trim() || null,
         chronicConditions: form.chronicConditions?.trim() || null,
@@ -449,9 +441,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                         <EditableRow label="Mobile" noBorder={false}>
                           <input value={form.mobile} onChange={(event) => setField("mobile", normalizeIndianMobile(event.target.value))} style={summaryInputStyle} placeholder="9876543210" />
                         </EditableRow>
-                        <EditableRow label="Emergency Contact" noBorder={false}>
-                          <input value={form.emergencyContact} onChange={(event) => setField("emergencyContact", normalizeIndianMobile(event.target.value))} style={summaryInputStyle} placeholder="9876543210" />
-                        </EditableRow>
                         <EditableRow label="Blood Group" noBorder={false}>
                           <input value={form.bloodGroup} onChange={(event) => setField("bloodGroup", event.target.value)} style={summaryInputStyle} />
                         </EditableRow>
@@ -470,7 +459,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                         <SummaryRow label="Full Name" value={form.name} />
                         <SummaryRow label="Age / Gender" value={`${form.age} / ${form.gender}`} />
                         <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
-                        <SummaryRow label="Emergency Contact" value={formatIndianMobile(form.emergencyContact)} />
                         <SummaryRow label="Blood Group" value={form.bloodGroup || "-"} />
                         <SummaryRow label="Address" value={form.address || "-"} />
                         <SummaryRow label="Allergies" value={form.allergies || "-"} />
@@ -555,7 +543,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                     <SummaryRow label="Pain Level" value={`${form.painScale}/10`} noBorder />
                   </div>
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 10, marginBottom: 10 }}>Your details will be reviewed by staff and the correct queue will be assigned.</div>
-                  <p style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>By clicking Confirm and Register, you confirm all information is accurate. The triage score is AI-generated and must be verified by a nurse before any clinical decision is made.</p>
+                  <p style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>By clicking Confirm and Register, you confirm all information is accurate. Final queue handling is always reviewed by hospital staff.</p>
                   <NavRow><GhostBtn onClick={() => setStep(2)}>Edit</GhostBtn><PrimaryBtn onClick={confirm} disabled={loading}>{loading ? "Registering..." : "Confirm and Register"}</PrimaryBtn></NavRow>
                 </>
               ) : null}

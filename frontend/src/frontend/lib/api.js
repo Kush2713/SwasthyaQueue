@@ -227,6 +227,13 @@ export function overrideQueuePriority(queueId, payload) {
   });
 }
 
+export function confirmQueuePriority(queueId, payload) {
+  return request(`/api/queue/${queueId}/confirm-priority`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 export function recordNurseTriage(queueId, payload) {
   return request(`/api/queue/${queueId}/triage`, {
     method: "POST",

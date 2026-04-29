@@ -460,10 +460,13 @@ export default function ReceptionDashboard({ user, onLogout }) {
           </section>
 
           <section style={{ background: "#fff", border: "1px solid #CBD5E1", borderRadius: 12, padding: 14, minHeight: 220, display: "flex", flexDirection: "column" }}>
-            <SectionTitle title="Reception Notes" subtitle="Operational guidance for the front desk" />
-            <Notice tone="info" text="Use assisted account for patients without a phone." />
-            <Notice tone="warn" text="Search token or mobile before creating a new visit." />
-            <Notice tone="neutral" text="Queue calling stays with reception. Nurse handles triage." />
+            <SectionTitle title="Desk Summary" subtitle="Live front-desk operational snapshot" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(120px, 1fr))", gap: 8, marginTop: 4 }}>
+              <InfoBox label="Visible Queue" value={receptionistStats.patientsVisible} />
+              <InfoBox label="Waiting" value={receptionistStats.waiting} />
+              <InfoBox label="In Consultation" value={receptionistStats.inConsult} />
+              <InfoBox label="Avg Wait" value={`${receptionistStats.avgWait} min`} />
+            </div>
           </section>
         </section>
 

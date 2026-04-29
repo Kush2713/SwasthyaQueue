@@ -24,7 +24,6 @@ const signupDefaults = {
   mobile: "",
   email: "",
   address: "",
-  emergencyContact: "",
   bloodGroup: "",
   allergies: "",
   chronicConditions: "",
@@ -114,15 +113,10 @@ export default function LoginPage({ onLogin }) {
     setNotice("");
 
     try {
-      if (!normalizeMobile(signupForm.emergencyContact)) {
-        throw new Error("Emergency contact is required.");
-      }
-
       const response = await signupPatientAccount({
         ...signupForm,
         age: Number(signupForm.age),
         mobile: normalizeMobile(signupForm.mobile),
-        emergencyContact: normalizeMobile(signupForm.emergencyContact),
       });
 
       const resolvedIdentifier = signupForm.email.trim() || normalizeMobile(signupForm.mobile);
@@ -349,9 +343,6 @@ export default function LoginPage({ onLogin }) {
 
                       <Field label="Address">
                         <textarea className={`${inputStyle} min-h-[78px]`} value={signupForm.address} onChange={(event) => setSignupField("address", event.target.value)} />
-                      </Field>
-                      <Field label="Emergency Contact *">
-                        <input className={inputStyle} value={signupForm.emergencyContact} onChange={(event) => setSignupField("emergencyContact", normalizeMobile(event.target.value))} placeholder="Emergency mobile number" />
                       </Field>
                       <Field label="Known Allergies">
                         <textarea className={`${inputStyle} min-h-[70px]`} value={signupForm.allergies} onChange={(event) => setSignupField("allergies", event.target.value)} placeholder="Food, medicine, or other allergies" />

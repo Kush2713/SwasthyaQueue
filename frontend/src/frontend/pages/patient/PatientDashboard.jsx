@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const COLORS = {
   navyDark: "#002060",
@@ -45,9 +45,11 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
   const [screenState, setScreenState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [queueNotice, setQueueNotice] = useState("");
   const [canceling, setCanceling] = useState(false);
   const [activeAppointment, setActiveAppointment] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
+  const previousActiveRef = useRef(null);
 
   const loadDashboardData = useCallback(async () => {
     setScreenState("loading");
@@ -88,6 +90,52 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
     }, 30000);
     return () => clearInterval(refreshId);
   }, [screenState, loadDashboardData]);
+
+  useEffect(() => {
+    if (screenState !== "ready") return;
+
+    if (!activeAppointment?.appointmentId) {
+      previousActiveRef.current = null;
+      return;
+    }
+
+    const current = {
+      appointmentId: activeAppointment.appointmentId,
+      position: Number.isFinite(Number(activeAppointment.position)) ? Number(activeAppointment.position) : null,
+      status: activeAppointment.queueStatus || activeAppointment.status || "",
+    };
+    const previous = previousActiveRef.current;
+
+    if (!previous || previous.appointmentId !== current.appointmentId) {
+      previousActiveRef.current = current;
+      return;
+    }
+
+    let notice = "";
+    if (previous.status !== current.status) {
+      if (current.status === "in-progress") notice = "Called to Consultation";
+      else if (current.status === "ready-for-doctor") notice = "Called to Triage";
+      else if (current.status === "completed") notice = "Visit Completed";
+      else if (current.status === "queued") notice = "Your token is active in queue.";
+    } else if (
+      current.position !== null &&
+      previous.position !== null &&
+      current.position !== previous.position
+    ) {
+      notice = current.position < previous.position
+        ? `Queue update: your position moved from ${previous.position} to ${current.position}.`
+        : `Queue update: your current position is ${current.position}.`;
+    }
+
+    if (notice) setQueueNotice(notice);
+    previousActiveRef.current = current;
+  }, [activeAppointment, screenState]);
+
+  useEffect(() => {
+    if (!queueNotice) return;
+    const timer = setTimeout(() => setQueueNotice(""), 40000);
+    return () => clearTimeout(timer);
+  }, [queueNotice]);
 
   const handleCancelAppointment = async () => {
     if (!activeAppointment?.appointmentId || canceling) return;
@@ -175,6 +223,12 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
           </section>
         ) : null}
 
+        {queueNotice ? (
+          <section style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 12, padding: "10px 12px", fontSize: 13, fontWeight: 700 }}>
+            {queueNotice}
+          </section>
+        ) : null}
+
         <section style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
           <div style={sectionCard}>
             <SectionTitle title="Active Appointment" subtitle="Your live token and queue status" />
@@ -224,7 +278,6 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
             <SummaryRow label="Mobile" value={formatIndianMobile(user?.mobile)} />
             <SummaryRow label="Age / Gender" value={`${user?.age || "-"} / ${user?.gender || "-"}`} />
             <SummaryRow label="Blood Group" value={user?.bloodGroup || "-"} />
-            <SummaryRow label="Emergency Contact" value={formatIndianMobile(user?.emergencyContact)} />
             <SummaryRow label="Email" value={user?.email || "-"} />
             <SummaryRow label="Allergies" value={user?.allergies || "-"} />
             <SummaryRow label="Conditions" value={user?.chronicConditions || "-"} noBorder />
@@ -249,10 +302,18 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
                   </div>
                   <div style={{ marginTop: 8, fontSize: 13, color: "#334155" }}>{appointment.symptoms}</div>
                   {appointment.preferredSlot ? <div style={{ marginTop: 6, fontSize: 12, color: "#64748B" }}>Preferred slot: {formatDateTime(appointment.preferredSlot)}</div> : null}
+                  {appointment.triage?.temperatureC || appointment.triage?.bloodPressure || appointment.triage?.pulseRate || appointment.triage?.spo2 || appointment.triage?.weightKg ? (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#334155" }}>
+                      Triage: Temp {appointment.triage?.temperatureC || "-"} F | BP {appointment.triage?.bloodPressure || "-"} | Pulse {appointment.triage?.pulseRate || "-"} | SpO2 {appointment.triage?.spo2 || "-"} | Weight {appointment.triage?.weightKg || "-"} kg
+                    </div>
+                  ) : null}
+                  {appointment.triage?.notes ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Nurse note: {appointment.triage.notes}</div> : null}
                   {appointment.doctor?.diagnosis ? <div style={{ marginTop: 6, fontSize: 13, color: "#334155" }}>Diagnosis: {appointment.doctor.diagnosis}</div> : null}
                   {appointment.doctor?.prescription ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Prescription / Advice: {appointment.doctor.prescription}</div> : null}
                   {appointment.doctor?.testsOrdered ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Tests: {appointment.doctor.testsOrdered}</div> : null}
+                  {appointment.doctor?.notes ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Doctor notes: {appointment.doctor.notes}</div> : null}
                   {appointment.doctor?.followUpDate ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>Follow-up: {formatDateTime(appointment.doctor.followUpDate)}</div> : null}
+                  {appointment.doctor?.followUpNotes ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>Follow-up advice: {appointment.doctor.followUpNotes}</div> : null}
                 </div>
               ))}
             </div>
