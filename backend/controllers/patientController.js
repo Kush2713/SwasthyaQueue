@@ -307,6 +307,68 @@ const lookupPatients = async (req, res) => {
       ]
     );
 
+    const patientIds = result.rows.map((row) => row.patient_id).filter(Boolean);
+    let historyByPatientId = {};
+
+    if (patientIds.length) {
+      const historyResult = await pool.query(
+        `
+          SELECT
+            a.patient_id,
+            a.appointment_id,
+            a.status AS appointment_status,
+            a.department_id,
+            d.name AS department_name,
+            a.symptoms,
+            a.preferred_slot,
+            a.created_at AS appointment_created_at,
+            q.queue_id,
+            q.token_number,
+            q.status AS queue_status,
+            q.priority_level,
+            q.created_at AS queue_created_at,
+            a.diagnosis,
+            a.prescription,
+            a.tests_ordered
+          FROM appointments a
+          JOIN departments d ON d.department_id = a.department_id
+          LEFT JOIN queue q ON q.appointment_id = a.appointment_id
+          WHERE a.patient_id = ANY($1::int[])
+          ORDER BY a.created_at DESC
+        `,
+        [patientIds]
+      );
+
+      historyByPatientId = historyResult.rows.reduce((acc, row) => {
+        if (!acc[row.patient_id]) acc[row.patient_id] = [];
+        if (acc[row.patient_id].length < 8) {
+          acc[row.patient_id].push({
+            appointmentId: row.appointment_id,
+            appointmentStatus: row.appointment_status,
+            departmentId: row.department_id,
+            department: row.department_name,
+            symptoms: row.symptoms,
+            preferredSlot: row.preferred_slot,
+            createdAt: row.appointment_created_at,
+            queueId: row.queue_id,
+            token: row.token_number,
+            tokenLabel: formatTokenLabel({
+              departmentName: row.department_name,
+              departmentId: row.department_id,
+              queueCreatedAt: row.queue_created_at || row.appointment_created_at,
+              tokenNumber: row.token_number,
+            }),
+            queueStatus: row.queue_status,
+            priorityLevel: row.priority_level,
+            diagnosis: row.diagnosis,
+            prescription: row.prescription,
+            testsOrdered: row.tests_ordered,
+          });
+        }
+        return acc;
+      }, {});
+    }
+
     const patients = result.rows.map((row) => ({
       patientId: row.patient_id,
       name: row.name,
@@ -339,6 +401,7 @@ const lookupPatients = async (req, res) => {
           }
         : null,
       hasActiveQueue: ["waiting", "in-progress"].includes(row.queue_status),
+      visitHistory: historyByPatientId[row.patient_id] || [],
     }));
 
     res.json({

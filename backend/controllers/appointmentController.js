@@ -1,7 +1,7 @@
 const pool = require("../db");
 const {
   createQueueEntry,
-  determinePriorityLevel,
+  analyzePrioritySuggestion,
   getQueuePositionInfo,
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
@@ -547,13 +547,14 @@ async function createAppointment(req, res) {
       return res.status(400).json({ error: slotError.message });
     }
 
-    const priorityLevel = await determinePriorityLevel({
+    const prioritySuggestion = await analyzePrioritySuggestion({
       symptoms,
       painScale: Number(pain_scale) || 0,
       age: patient.age,
       isPregnant: Boolean(is_pregnant),
       isDisabled: Boolean(is_disabled),
     });
+    const priorityLevel = prioritySuggestion.suggestedPriorityLevel;
 
     const appointmentResult = await client.query(
       `
@@ -607,6 +608,7 @@ async function createAppointment(req, res) {
         symptoms: symptoms.trim(),
         preferredSlot: normalizedPreferredSlot,
         priorityLevel,
+        prioritySuggestion,
       },
     });
 
@@ -618,6 +620,7 @@ async function createAppointment(req, res) {
         ...mapAppointmentRow(details),
         position: positionInfo.position,
         estimatedWait: positionInfo.estimatedWaitTime,
+        prioritySuggestion,
       },
     });
   } catch (err) {
@@ -712,14 +715,14 @@ async function createQuickIntake(req, res) {
       );
 
     const appointment = appointmentResult.rows[0];
-    const suggestedPriorityLevel = await determinePriorityLevel({
+    const prioritySuggestion = await analyzePrioritySuggestion({
       symptoms: appointment.symptoms,
       painScale: 0,
       age: patientAge,
       isPregnant: false,
       isDisabled: false,
     });
-    const priorityLevel = Math.min(suggestedPriorityLevel, 2);
+    const priorityLevel = Math.min(prioritySuggestion.suggestedPriorityLevel, 2);
 
     const queue = await createQueueEntry(client, {
       appointmentId: appointment.appointment_id,
@@ -753,6 +756,7 @@ async function createQuickIntake(req, res) {
         departmentId: department_id,
         symptoms: appointment.symptoms,
         priorityLevel,
+        prioritySuggestion,
         mobileCaptured: Boolean(normalizedMobile),
       },
     });

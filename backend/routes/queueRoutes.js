@@ -11,6 +11,7 @@ const {
   getPosition,
   flagUrgentReview,
   approvePriorityOverride,
+  confirmPrioritySuggestion,
   recordNurseTriage,
   markReadyForDoctor,
 } = require("../controllers/queueController");
@@ -25,6 +26,7 @@ router.post("/next", requireRoles(["receptionist"]), callNextPatient);
 router.post("/complete", requireRoles(["doctor"]), completePatient);
 router.post("/:queue_id/urgent-review", requireRoles(["receptionist"]), flagUrgentReview);
 router.post("/:queue_id/override-priority", requireRoles(["nurse"]), approvePriorityOverride);
+router.post("/:queue_id/confirm-priority", requireRoles(["nurse"]), confirmPrioritySuggestion);
 router.post("/:queue_id/triage", requireRoles(["nurse"]), recordNurseTriage);
 router.post("/:queue_id/ready-for-doctor", requireRoles(["nurse"]), markReadyForDoctor);
 

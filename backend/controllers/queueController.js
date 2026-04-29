@@ -1,6 +1,6 @@
 const {
   createQueueEntry,
-  determinePriorityLevel,
+  analyzePrioritySuggestion,
   pool,
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
@@ -65,13 +65,14 @@ const addToQueue = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const priority_level = await determinePriorityLevel({
+    const prioritySuggestion = await analyzePrioritySuggestion({
       symptoms,
       painScale: Number(pain_scale) || 0,
       age,
       isPregnant: req.body.is_pregnant,
       isDisabled: req.body.is_disabled,
     });
+    const priority_level = prioritySuggestion.suggestedPriorityLevel;
 
     const queue = await createQueueEntry(pool, {
       appointmentId: appointment_id || null,
@@ -104,12 +105,14 @@ const addToQueue = async (req, res) => {
       details: {
         departmentId: department_id,
         priorityLevel: priority_level,
+        prioritySuggestion,
       },
     });
 
     res.status(201).json({
       message: "Added to queue successfully",
       priority_used: priority_level,
+      priority_suggestion: prioritySuggestion,
       queue,
     });
   } catch (err) {
@@ -169,15 +172,27 @@ const getQueueByDepartment = async (req, res) => {
       [department_id]
     );
 
-    const enhancedQueue = result.rows.map((patient, index) => ({
-      ...patient,
-      token_label: formatTokenLabel({
-        departmentName,
-        departmentId: department_id,
-        queueCreatedAt: patient.created_at,
-        tokenNumber: patient.token_number,
-      }),
-      estimated_wait_time: index * avgTime,
+    const enhancedQueue = await Promise.all(result.rows.map(async (patient, index) => {
+      const prioritySuggestion = await analyzePrioritySuggestion({
+        symptoms: patient.symptoms,
+        painScale: patient.pain_scale,
+        age: patient.age,
+        isPregnant: false,
+        isDisabled: false,
+      });
+
+      return {
+        ...patient,
+        token_label: formatTokenLabel({
+          departmentName,
+          departmentId: department_id,
+          queueCreatedAt: patient.created_at,
+          tokenNumber: patient.token_number,
+        }),
+        estimated_wait_time: index * avgTime,
+        priority_suggestion: prioritySuggestion,
+        priority_human_confirmed: Boolean(patient.escalated_at || patient.assessed_at),
+      };
     }));
 
     res.json(enhancedQueue);
@@ -538,6 +553,83 @@ const approvePriorityOverride = async (req, res) => {
   }
 };
 
+const confirmPrioritySuggestion = async (req, res) => {
+  try {
+    const queueId = Number(req.params.queue_id);
+    const actor = getActorFromRequest(req, { role: "nurse", name: "Triage Nurse" });
+    const confirmedPriorityLevel = Number(req.body.priority_level);
+    const note = String(req.body.note || "").trim();
+
+    if (!Number.isFinite(queueId)) {
+      return res.status(400).json({ error: "Invalid queue id." });
+    }
+
+    const queueResult = await pool.query(
+      `
+        SELECT q.*, a.symptoms, a.pain_scale, p.age
+        FROM queue q
+        LEFT JOIN appointments a ON a.appointment_id = q.appointment_id
+        LEFT JOIN patients p ON p.patient_id = q.patient_id
+        WHERE q.queue_id = $1
+          AND q.status IN ('waiting', 'in-progress')
+        LIMIT 1
+      `,
+      [queueId]
+    );
+
+    if (!queueResult.rows.length) {
+      return res.status(404).json({ error: "Queue entry not found for confirmation." });
+    }
+
+    const current = queueResult.rows[0];
+    const suggestion = await analyzePrioritySuggestion({
+      symptoms: current.symptoms,
+      painScale: current.pain_scale,
+      age: current.age,
+      isPregnant: false,
+      isDisabled: false,
+    });
+
+    const finalPriority = [1, 2, 3].includes(confirmedPriorityLevel)
+      ? confirmedPriorityLevel
+      : current.priority_level;
+
+    const updateResult = await pool.query(
+      `
+        UPDATE queue
+        SET priority_level = $2
+        WHERE queue_id = $1
+        RETURNING *
+      `,
+      [queueId, finalPriority]
+    );
+
+    await logWorkflowEvent(pool, {
+      actor,
+      action: "priority_confirmed_by_nurse",
+      entityType: "queue",
+      entityId: queueId,
+      patientId: current.patient_id,
+      appointmentId: current.appointment_id || null,
+      queueId,
+      details: {
+        finalPriorityLevel: finalPriority,
+        suggestion,
+        note: note || null,
+      },
+    });
+
+    res.json({
+      message: "Priority confirmed by nurse.",
+      queue: updateResult.rows[0],
+      priority_suggestion: suggestion,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to confirm priority right now." });
+  }
+};
+
 const recordNurseTriage = async (req, res) => {
   try {
     const queueId = Number(req.params.queue_id);
@@ -723,6 +815,7 @@ module.exports = {
   getPosition,
   flagUrgentReview,
   approvePriorityOverride,
+  confirmPrioritySuggestion,
   recordNurseTriage,
   markReadyForDoctor,
 };

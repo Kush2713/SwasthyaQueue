@@ -3,41 +3,99 @@ const pool = require("../db");
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:5001";
 
-async function determinePriorityLevel({ symptoms, painScale, age, isPregnant, isDisabled }) {
-  try {
-    const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict`, {
-      age: age || 30,
-      pain_scale: painScale || 0,
-      symptom_code: 2,
-    });
+function clampPriority(value, fallback = 3) {
+  const parsed = Number(value);
+  if (![1, 2, 3].includes(parsed)) return fallback;
+  return parsed;
+}
 
-    return mlResponse.data.priority;
-  } catch (mlError) {
-    let priorityLevel = 3;
-    const normalizedSymptoms = String(symptoms || "").toLowerCase();
+function getRuleBasedPriority({ symptoms, painScale, age, isPregnant, isDisabled }) {
+  let priorityLevel = 3;
+  const reasons = [];
+  const normalizedSymptoms = String(symptoms || "").toLowerCase();
+  const pain = Number(painScale) || 0;
+  const personAge = Number(age) || 0;
 
-    if (
-      normalizedSymptoms.includes("chest pain") ||
-      normalizedSymptoms.includes("breathing") ||
-      normalizedSymptoms.includes("unconscious")
-    ) {
-      priorityLevel = 1;
-    } else if (painScale >= 8) {
-      priorityLevel = 1;
-    } else if (painScale >= 5) {
-      priorityLevel = 2;
-    }
-
-    if (age >= 60 || age <= 5) {
-      priorityLevel = Math.min(priorityLevel, 2);
-    }
-
-    if (isPregnant || isDisabled) {
-      priorityLevel = 1;
-    }
-
-    return priorityLevel;
+  if (
+    normalizedSymptoms.includes("chest pain") ||
+    normalizedSymptoms.includes("breathing") ||
+    normalizedSymptoms.includes("unconscious") ||
+    normalizedSymptoms.includes("seizure") ||
+    normalizedSymptoms.includes("stroke")
+  ) {
+    priorityLevel = 1;
+    reasons.push("Hard clinical red-flag symptom");
+  } else if (pain >= 8) {
+    priorityLevel = 1;
+    reasons.push("Severe pain score (>=8)");
+  } else if (pain >= 5) {
+    priorityLevel = 2;
+    reasons.push("Moderate pain score (>=5)");
   }
+
+  if (personAge >= 60 || (personAge > 0 && personAge <= 5)) {
+    priorityLevel = Math.min(priorityLevel, 2);
+    reasons.push("Age vulnerability modifier");
+  }
+
+  if (isPregnant || isDisabled) {
+    priorityLevel = 1;
+    reasons.push("High-risk vulnerability modifier");
+  }
+
+  return {
+    priorityLevel,
+    reasons,
+    hardRule: priorityLevel === 1 && reasons.some((reason) => reason.toLowerCase().includes("red-flag")),
+  };
+}
+
+async function analyzePrioritySuggestion({ symptoms, painScale, age, isPregnant, isDisabled }) {
+  const rule = getRuleBasedPriority({ symptoms, painScale, age, isPregnant, isDisabled });
+
+  try {
+    const mlResponse = await axios.post(
+      `${ML_SERVICE_URL}/predict`,
+      {
+        age: age || 30,
+        pain_scale: painScale || 0,
+        symptom_code: 2,
+      },
+      { timeout: 3000 }
+    );
+
+    const mlPriority = clampPriority(mlResponse?.data?.priority, rule.priorityLevel);
+
+    // Human-in-loop safety: hard clinical red flags cannot be downgraded by ML.
+    const suggestedPriorityLevel = rule.hardRule ? Math.min(rule.priorityLevel, mlPriority) : mlPriority;
+
+    return {
+      suggestedPriorityLevel,
+      source: "ml+rules",
+      mlPriorityLevel: mlPriority,
+      rulePriorityLevel: rule.priorityLevel,
+      confidence: Number.isFinite(Number(mlResponse?.data?.confidence)) ? Number(mlResponse.data.confidence) : null,
+      reason: rule.reasons.join("; ") || "ML suggestion with rule guardrails",
+      requiresHumanConfirmation: true,
+      mlAvailable: true,
+    };
+  } catch (mlError) {
+    return {
+      suggestedPriorityLevel: rule.priorityLevel,
+      source: "rules-fallback",
+      mlPriorityLevel: null,
+      rulePriorityLevel: rule.priorityLevel,
+      confidence: null,
+      reason: rule.reasons.join("; ") || "Rule-based fallback",
+      requiresHumanConfirmation: true,
+      mlAvailable: false,
+    };
+  }
+}
+
+async function determinePriorityLevel(input) {
+  const suggestion = await analyzePrioritySuggestion(input);
+  return suggestion.suggestedPriorityLevel;
 }
 
 async function createQueueEntry(db, { appointmentId, patientId, departmentId, priorityLevel }) {
@@ -87,6 +145,7 @@ async function getQueuePositionInfo(db, queueId, departmentId) {
 }
 
 module.exports = {
+  analyzePrioritySuggestion,
   determinePriorityLevel,
   createQueueEntry,
   getQueuePositionInfo,
