@@ -8,6 +8,21 @@ const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
 
+function parseTimeToMinutes(value, fallback) {
+  const raw = String(value || "");
+  const [hText, mText] = raw.split(":");
+  const h = Number(hText);
+  const m = Number(mText);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return fallback;
+  return h * 60 + m;
+}
+
+const OPD_START_MINUTES = parseTimeToMinutes(process.env.OPD_START_TIME, 9 * 60 + 30);
+const OPD_END_MINUTES = parseTimeToMinutes(process.env.OPD_END_TIME, 21 * 60 + 30);
+const OPD_START_TEXT = process.env.OPD_START_TIME || "09:30";
+const OPD_END_TEXT = process.env.OPD_END_TIME || "21:30";
+
 function mapAppointmentRow(row) {
   return {
     appointmentId: row.appointment_id,
@@ -64,11 +79,11 @@ function normalizePreferredSlot(preferredSlot) {
   const hours = parsed.getHours();
   const minutes = parsed.getMinutes();
   const totalMinutes = hours * 60 + minutes;
-  const opdStart = 9 * 60 + 30;
-  const opdEnd = 21 * 60 + 30;
+  const opdStart = OPD_START_MINUTES;
+  const opdEnd = OPD_END_MINUTES;
 
   if (totalMinutes < opdStart || totalMinutes > opdEnd) {
-    throw new Error("Preferred slot must be within OPD hours: 9:30 AM to 9:30 PM.");
+    throw new Error(`Preferred slot must be within OPD hours: ${OPD_START_TEXT} to ${OPD_END_TEXT}.`);
   }
 
   return parsed.toISOString();

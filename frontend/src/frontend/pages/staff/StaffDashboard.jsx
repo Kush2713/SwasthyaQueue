@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { TIMING } from "../../lib/timing";
 
 const COLORS = {
   navyDark: "#002060",
@@ -198,7 +199,7 @@ export default function StaffDashboard({ user, onLogout }) {
     if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadDashboardData();
-    }, 10000);
+    }, TIMING.staffPollMs);
     const onFocus = () => {
       loadDashboardData();
     };
@@ -262,7 +263,7 @@ export default function StaffDashboard({ user, onLogout }) {
   const triagePatients = useMemo(
     () =>
       patients
-        .filter((patient) => (patient.rawStatus === "waiting" || patient.rawStatus === "in-progress") && patient.appointmentStatus !== "ready-for-doctor")
+        .filter((patient) => patient.rawStatus === "in-progress" && patient.appointmentStatus !== "ready-for-doctor")
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
@@ -918,7 +919,7 @@ export default function StaffDashboard({ user, onLogout }) {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                               <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Full Case</button>
                               <button type="button" onClick={() => confirmPriority(patient)} style={{ ...btnGhost, borderColor: "#2563EB", color: "#1D4ED8" }}>
-                                {patient.priorityHumanConfirmed ? "Priority Confirmed" : "Confirm Priority"}
+                                {patient.priorityHumanConfirmed ? "Priority" : "Confirm Priority"}
                               </button>
                               <button
                                 type="button"

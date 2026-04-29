@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { TIMING } from "../../lib/timing";
 
 const COLORS = {
   pageBg: "#EEF2F7",
@@ -170,7 +171,7 @@ export default function LiveQueueDisplay() {
     if (screenState !== "ready") return;
     const id = setInterval(() => {
       loadDisplayData();
-    }, 10000);
+    }, TIMING.displayPollMs);
     const onFocus = () => {
       loadDisplayData();
     };

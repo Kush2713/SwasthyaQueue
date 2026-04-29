@@ -677,7 +677,8 @@ const recordNurseTriage = async (req, res) => {
         FROM queue q
         WHERE q.queue_id = $1
           AND q.appointment_id = a.appointment_id
-          AND q.status IN ('waiting', 'in-progress')
+          AND q.status = 'in-progress'
+          AND a.status IN ('in-progress', 'ready-for-doctor')
         RETURNING
           a.appointment_id,
           a.temperature_c,
@@ -767,7 +768,8 @@ const markReadyForDoctor = async (req, res) => {
         FROM queue q
         WHERE q.queue_id = $1
           AND q.appointment_id = a.appointment_id
-          AND q.status IN ('waiting', 'in-progress')
+          AND q.status = 'in-progress'
+          AND a.status IN ('in-progress', 'ready-for-doctor')
         RETURNING a.appointment_id, a.patient_id, a.status, a.assessed_by_name, a.assessed_at
       `,
       [queueId, assessedByName, temperatureF, bloodPressure || null, pulseRate, spo2, weightKg, triageNotes || null]

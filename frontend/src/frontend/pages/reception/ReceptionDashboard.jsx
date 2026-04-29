@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { TIMING } from "../../lib/timing";
 
 const COLORS = {
   navyDark: "#002060",
@@ -170,7 +171,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
     if (screenState !== "ready") return;
     const timer = setInterval(() => {
       loadReceptionData();
-    }, 20000);
+    }, TIMING.receptionPollMs);
     const onFocus = () => {
       loadReceptionData();
     };

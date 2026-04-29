@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TIMING } from "../../lib/timing";
 
 const COLORS = {
   navyDark: "#002060",
@@ -87,7 +88,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
     if (screenState !== "ready") return;
     const refreshId = setInterval(() => {
       loadDashboardData();
-    }, 30000);
+    }, TIMING.patientPollMs);
     return () => clearInterval(refreshId);
   }, [screenState, loadDashboardData]);
 
@@ -133,7 +134,7 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
 
   useEffect(() => {
     if (!queueNotice) return;
-    const timer = setTimeout(() => setQueueNotice(""), 40000);
+    const timer = setTimeout(() => setQueueNotice(""), TIMING.patientNoticeMs);
     return () => clearTimeout(timer);
   }, [queueNotice]);
 

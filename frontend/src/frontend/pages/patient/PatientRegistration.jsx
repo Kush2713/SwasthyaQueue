@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getOpdHoursLabel, getOpdSlotOptions } from "../../lib/timing";
 
 const COLORS = {
   navyDark: "#002060",
@@ -34,13 +35,8 @@ const symptomDefs = [
 
 const symptomMap = Object.fromEntries(symptomDefs.map((item) => [item.key, item]));
 const fallbackDepartments = ["General Medicine", "Cardiology", "Orthopedics", "Pediatrics", "Emergency"];
-const slotTimeOptions = [
-  "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00",
-  "14:30", "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00", "18:30", "19:00",
-  "19:30", "20:00", "20:30", "21:00", "21:30",
-];
+const slotTimeOptions = getOpdSlotOptions();
+const OPD_HOURS_LABEL = getOpdHoursLabel();
 
 const labelStyle = { fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6, display: "block" };
 const inputStyle = {
@@ -478,7 +474,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                 <>
                   {departmentLoadError ? <NoticeBox message={departmentLoadError} /> : null}
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 12, marginBottom: 12, fontSize: 13 }}>
-                    Select the symptoms that best match the patient. Hospital appointment hours are 9:30 AM to 9:30 PM.
+                    Select the symptoms that best match the patient. Hospital appointment hours are {OPD_HOURS_LABEL}.
                   </div>
                   <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 14 }}>
                     {symptomDefs.map((item) => {
@@ -525,7 +521,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                     </Field>
                   </Row2Col>
                   <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
-                    OPD appointment hours are 9:30 AM to 9:30 PM. Please choose a slot within hospital hours.
+                    OPD appointment hours are {OPD_HOURS_LABEL}. Please choose a slot within hospital hours.
                   </div>
                   <NavRow><GhostBtn onClick={() => setStep(1)}>Back</GhostBtn><PrimaryBtn onClick={next}>Review</PrimaryBtn></NavRow>
                 </>
