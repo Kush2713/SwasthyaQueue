@@ -22,6 +22,26 @@ const OPD_START_MINUTES = parseTimeToMinutes(process.env.OPD_START_TIME, 9 * 60 
 const OPD_END_MINUTES = parseTimeToMinutes(process.env.OPD_END_TIME, 21 * 60 + 30);
 const OPD_START_TEXT = process.env.OPD_START_TIME || "09:30";
 const OPD_END_TEXT = process.env.OPD_END_TIME || "21:30";
+const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
+
+function getTimeZoneDateParts(value, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const bag = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(bag.year),
+    month: Number(bag.month),
+    day: Number(bag.day),
+  };
+}
+
+function datePartsToKey(parts) {
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
 
 function mapAppointmentRow(row) {
   return {
@@ -74,6 +94,13 @@ function normalizePreferredSlot(preferredSlot) {
   const parsed = new Date(preferredSlot);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error("Invalid preferred slot selected.");
+  }
+
+  const slotDateKey = datePartsToKey(getTimeZoneDateParts(parsed, HOSPITAL_TIMEZONE));
+  const todayDateKey = datePartsToKey(getTimeZoneDateParts(new Date(), HOSPITAL_TIMEZONE));
+
+  if (slotDateKey <= todayDateKey) {
+    throw new Error("Preferred slot must be on a date after today.");
   }
 
   const hours = parsed.getHours();

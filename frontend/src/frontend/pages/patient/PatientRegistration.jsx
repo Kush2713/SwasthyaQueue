@@ -102,6 +102,15 @@ function getTodayDateValue() {
   return `${year}-${month}-${day}`;
 }
 
+function getTomorrowDateValue() {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  const year = next.getFullYear();
+  const month = String(next.getMonth() + 1).padStart(2, "0");
+  const day = String(next.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function PatientRegistration({ onBack, user, onRegistered }) {
   const initialForm = {
     name: user?.name || "",
@@ -200,6 +209,12 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     }
     if ((form.preferredDate && !form.preferredTime) || (!form.preferredDate && form.preferredTime)) {
       return "Select both preferred date and preferred time, or leave both empty.";
+    }
+    if (form.preferredDate) {
+      const today = getTodayDateValue();
+      if (form.preferredDate <= today) {
+        return "Preferred appointment date must be after today.";
+      }
     }
     return "";
   };
@@ -509,7 +524,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                   <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...availableDepartments]} /></Field>
                   <Row2Col>
                     <Field label="Preferred Date (optional)">
-                      <input type="date" min={getTodayDateValue()} value={form.preferredDate} onChange={(event) => setField("preferredDate", event.target.value)} style={inputStyle} />
+                      <input type="date" min={getTomorrowDateValue()} value={form.preferredDate} onChange={(event) => setField("preferredDate", event.target.value)} style={inputStyle} />
                     </Field>
                     <Field label="Preferred Time (optional)">
                       <select value={form.preferredTime} onChange={(event) => setField("preferredTime", event.target.value)} style={inputStyle}>
