@@ -259,7 +259,8 @@ export default function StaffDashboard({ user, onLogout }) {
         .filter(
           (patient) =>
             patient.rawStatus === "waiting"
-            && (patient.urgentReviewRequested || patient.priority === "high" || patient.priority === "critical")
+            && patient.urgentReviewRequested
+            && !patient.priorityHumanConfirmed
         )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
@@ -321,11 +322,7 @@ export default function StaffDashboard({ user, onLogout }) {
   const doctorPatients = useMemo(
     () =>
       patients
-        .filter((patient) =>
-          patient.appointmentStatus === "ready-for-doctor"
-          || patient.rawStatus === "in-progress"
-          || (patient.urgentReviewRequested && patient.priority === "critical" && patient.rawStatus === "waiting")
-        )
+        .filter((patient) => patient.appointmentStatus === "ready-for-doctor" || patient.rawStatus === "in-progress")
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
@@ -911,7 +908,7 @@ export default function StaffDashboard({ user, onLogout }) {
                               </div>
                             </div>
 
-                            {patient.urgentReviewRequested ? (
+                            {patient.urgentReviewRequested && !patient.priorityHumanConfirmed ? (
                               <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: "9px 10px", fontSize: 13 }}>
                                 <strong>Urgent review:</strong> {patient.urgentReviewReason || "Reception requested immediate nurse review."}
                               </div>
@@ -959,7 +956,7 @@ export default function StaffDashboard({ user, onLogout }) {
                               >
                                 {triageReady ? "Ready For Doctor" : "Save Triage"}
                               </button>
-                              {patient.urgentReviewRequested ? (
+                              {patient.urgentReviewRequested && !patient.priorityHumanConfirmed ? (
                                 <>
                                   <button type="button" onClick={() => approvePriority(patient.queueId, 2)} style={{ ...btnPrimary, background: "#D97706" }}>Mark High</button>
                                   <button type="button" onClick={() => approvePriority(patient.queueId, 1)} style={{ ...btnPrimary, background: "#DC2626" }}>Mark Critical</button>
