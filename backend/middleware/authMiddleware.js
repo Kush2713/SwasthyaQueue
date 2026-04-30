@@ -20,7 +20,12 @@ async function requireAuth(req, res, next) {
     try {
       const staffUser = await getStaffAccountByUserId(pool, payload.user_id);
       if (staffUser?.active && staffUser.role === payload.role) {
-        req.auth = payload;
+        req.auth = {
+          ...payload,
+          staff_id: staffUser.staffId,
+          assigned_department_ids: staffUser.assignedDepartmentIds || [],
+          primary_department_id: staffUser.primaryDepartmentId || null,
+        };
         return next();
       }
     } catch (error) {
@@ -35,6 +40,42 @@ async function requireAuth(req, res, next) {
 
   req.auth = payload;
   next();
+}
+
+async function attachOptionalAuth(req, _res, next) {
+  const token = getBearerToken(req);
+  const payload = verifyAuthToken(token);
+
+  if (!payload) {
+    return next();
+  }
+
+  if (payload.role === "patient") {
+    req.auth = payload;
+    return next();
+  }
+
+  try {
+    const staffUser = await getStaffAccountByUserId(pool, payload.user_id);
+    if (staffUser?.active && staffUser.role === payload.role) {
+      req.auth = {
+        ...payload,
+        staff_id: staffUser.staffId,
+        assigned_department_ids: staffUser.assignedDepartmentIds || [],
+        primary_department_id: staffUser.primaryDepartmentId || null,
+      };
+      return next();
+    }
+  } catch (_error) {
+    // silent fallback below
+  }
+
+  const legacyStaff = getStaffUserById(payload.user_id);
+  if (legacyStaff && legacyStaff.role === payload.role) {
+    req.auth = payload;
+  }
+
+  return next();
 }
 
 function requirePatientAuth(req, res, next) {
@@ -62,4 +103,29 @@ function getActorFromRequest(req, fallback = {}) {
   };
 }
 
-module.exports = { requireAuth, requirePatientAuth, requireRoles, getActorFromRequest };
+function getAssignedDepartmentIdsFromAuth(auth) {
+  const ids = Array.isArray(auth?.assigned_department_ids) ? auth.assigned_department_ids : [];
+  return Array.from(new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))));
+}
+
+function hasDepartmentAccess(auth, departmentId) {
+  const role = auth?.role;
+  if (!["receptionist", "nurse", "doctor"].includes(role)) return true;
+
+  const ids = getAssignedDepartmentIdsFromAuth(auth);
+  if (!ids.length) return true; // compatibility fallback until full enforcement rollout
+
+  const numericDepartmentId = Number(departmentId);
+  if (!Number.isFinite(numericDepartmentId)) return false;
+  return ids.includes(numericDepartmentId);
+}
+
+module.exports = {
+  requireAuth,
+  attachOptionalAuth,
+  requirePatientAuth,
+  requireRoles,
+  getActorFromRequest,
+  getAssignedDepartmentIdsFromAuth,
+  hasDepartmentAccess,
+};

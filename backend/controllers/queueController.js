@@ -11,6 +11,19 @@ const {
 } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
 
+async function getQueueDepartmentId(queueId) {
+  const result = await pool.query(
+    `
+      SELECT department_id
+      FROM queue
+      WHERE queue_id = $1
+      LIMIT 1
+    `,
+    [queueId]
+  );
+  return result.rows[0]?.department_id ?? null;
+}
+
 function toNullableNumber(value) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -67,6 +80,9 @@ const addToQueue = async (req, res) => {
 
     if (!patient_id || !department_id) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (!hasDepartmentAccess(req.auth, department_id)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
     const prioritySuggestion = await analyzePrioritySuggestion({
@@ -294,7 +310,14 @@ const checkTurn = async (req, res) => {
 const callNextPatient = async (req, res) => {
   try {
     const { department_id } = req.body;
+    const departmentId = Number(department_id);
     const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
+    if (!Number.isFinite(departmentId)) {
+      return res.status(400).json({ error: "Invalid department id." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
+    }
 
     const result = await pool.query(
       `
@@ -304,7 +327,7 @@ const callNextPatient = async (req, res) => {
         ORDER BY priority_level ASC, token_number ASC
         LIMIT 1
       `,
-      [department_id]
+      [departmentId]
     );
 
     if (result.rows.length === 0) {
@@ -339,7 +362,7 @@ const callNextPatient = async (req, res) => {
       appointmentId: patient.appointment_id || null,
       queueId: patient.queue_id,
       details: {
-        departmentId: department_id,
+        departmentId,
         tokenNumber: patient.token_number,
       },
     });
@@ -358,7 +381,19 @@ const callNextPatient = async (req, res) => {
 const completePatient = async (req, res) => {
   try {
     const { queue_id } = req.body;
+    const queueId = Number(queue_id);
     const actor = getActorFromRequest(req, { role: "doctor", name: "Doctor" });
+    if (!Number.isFinite(queueId)) {
+      return res.status(400).json({ error: "Invalid queue id." });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Queue entry not found." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
+    }
 
     const result = await pool.query(
       `
@@ -367,7 +402,7 @@ const completePatient = async (req, res) => {
         WHERE queue_id = $1
         RETURNING *
       `,
-      [queue_id]
+      [queueId]
     );
 
     if (result.rows[0]?.appointment_id) {
@@ -479,6 +514,14 @@ const flagUrgentReview = async (req, res) => {
       return res.status(400).json({ error: "Please provide a reason for urgent review." });
     }
 
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Queue entry not found for urgent review." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
+    }
+
     const result = await pool.query(
       `
         UPDATE queue
@@ -534,6 +577,14 @@ const approvePriorityOverride = async (req, res) => {
 
     if (![1, 2, 3].includes(priorityLevel)) {
       return res.status(400).json({ error: "Priority level must be 1, 2, or 3." });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Queue entry not found for escalation." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
     const result = await pool.query(
@@ -600,6 +651,14 @@ const confirmPrioritySuggestion = async (req, res) => {
 
     if (!Number.isFinite(queueId)) {
       return res.status(400).json({ error: "Invalid queue id." });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Queue entry not found for confirmation." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
     const queueResult = await pool.query(
@@ -704,6 +763,14 @@ const recordNurseTriage = async (req, res) => {
       return res.status(400).json({ error: "Assessed by name is required." });
     }
 
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Active appointment not found for triage." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
+    }
+
     const validationError = validateTriageVitals({
       temperatureF,
       pulseRate,
@@ -792,6 +859,14 @@ const markReadyForDoctor = async (req, res) => {
 
     if (!Number.isFinite(queueId)) {
       return res.status(400).json({ error: "Invalid queue id." });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
+    if (!departmentId) {
+      return res.status(404).json({ error: "Active appointment not found for doctor handoff." });
+    }
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
     const validationError = validateTriageVitals({

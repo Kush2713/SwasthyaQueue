@@ -5,7 +5,7 @@ const {
   getQueuePositionInfo,
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
-const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { getActorFromRequest, hasDepartmentAccess } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
 
 function parseTimeToMinutes(value, fallback) {
@@ -421,7 +421,7 @@ async function saveDoctorUpdate(req, res) {
 
     const appointmentResult = await client.query(
       `
-        SELECT appointment_id, patient_id, queue_id, status
+        SELECT appointment_id, patient_id, queue_id, status, department_id
         FROM appointments
         WHERE appointment_id = $1
         LIMIT 1
@@ -435,6 +435,10 @@ async function saveDoctorUpdate(req, res) {
     }
 
     const appointment = appointmentResult.rows[0];
+    if (!hasDepartmentAccess(req.auth, appointment.department_id)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not assigned to this department." });
+    }
     const nextStatus = completeVisit
       ? "completed"
       : ["queued", "ready-for-doctor"].includes(appointment.status)
@@ -548,6 +552,10 @@ async function createAppointment(req, res) {
     if (!departmentResult.rows.length) {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "Selected department is not available." });
+    }
+    if (!hasDepartmentAccess(req.auth, department_id)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
     const patientResult = await client.query(
