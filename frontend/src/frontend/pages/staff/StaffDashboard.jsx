@@ -42,7 +42,28 @@ function buildClinicalFlags({ temperatureF, pulseRate, spo2, painScale }) {
   return flags;
 }
 
-function validateTriageDraft(draft) {
+const TRIAGE_PROFILES = {
+  "General Medicine": { required: ["temperature_f", "blood_pressure", "pulse_rate", "spo2"] },
+  Cardiology: { required: ["blood_pressure", "pulse_rate", "spo2"] },
+  Orthopedics: { required: ["blood_pressure", "pulse_rate"] },
+  Pediatrics: { required: ["temperature_f", "pulse_rate", "spo2", "weight_kg"] },
+  Emergency: { required: ["temperature_f", "blood_pressure", "pulse_rate", "spo2", "triage_notes"] },
+};
+
+const TRIAGE_LABELS = {
+  temperature_f: "Temperature (F)",
+  blood_pressure: "Blood Pressure",
+  pulse_rate: "Pulse",
+  spo2: "SpO2",
+  weight_kg: "Weight",
+  triage_notes: "Triage Notes",
+};
+
+function getTriageProfile(departmentName) {
+  return TRIAGE_PROFILES[departmentName] || TRIAGE_PROFILES["General Medicine"];
+}
+
+function validateTriageDraft(draft, profile = TRIAGE_PROFILES["General Medicine"], departmentName = "General Medicine") {
   const toNumber = (value) => {
     if (value === "" || value === null || value === undefined) return null;
     const parsed = Number(value);
@@ -54,9 +75,24 @@ function validateTriageDraft(draft) {
   const spo2 = toNumber(draft.spo2);
   const weightKg = toNumber(draft.weight_kg);
   const bloodPressure = String(draft.blood_pressure || "").trim();
+  const triageNotes = String(draft.triage_notes || "").trim();
 
   if ([temperatureF, pulseRate, spo2, weightKg].some(Number.isNaN)) {
     return "Vitals must be numeric values.";
+  }
+
+  const missing = [];
+  for (const field of profile.required || []) {
+    if (field === "temperature_f" && temperatureF === null) missing.push(field);
+    if (field === "blood_pressure" && !bloodPressure) missing.push(field);
+    if (field === "pulse_rate" && pulseRate === null) missing.push(field);
+    if (field === "spo2" && spo2 === null) missing.push(field);
+    if (field === "weight_kg" && weightKg === null) missing.push(field);
+    if (field === "triage_notes" && !triageNotes) missing.push(field);
+  }
+
+  if (missing.length) {
+    return `${departmentName} requires: ${missing.map((field) => TRIAGE_LABELS[field] || field).join(", ")}.`;
   }
 
   if (temperatureF !== null && (temperatureF < 86 || temperatureF > 113)) {
@@ -487,7 +523,7 @@ export default function StaffDashboard({ user, onLogout }) {
     try {
       const { recordNurseTriage } = await import("../../lib/api");
       const draft = getTriageDraft(patient);
-      const validationError = validateTriageDraft(draft);
+      const validationError = validateTriageDraft(draft, getTriageProfile(patient.department), patient.department);
       if (validationError) {
         pushToast(validationError);
         return;
@@ -516,7 +552,7 @@ export default function StaffDashboard({ user, onLogout }) {
     try {
       const { markReadyForDoctor } = await import("../../lib/api");
       const draft = getTriageDraft(patient);
-      const validationError = validateTriageDraft(draft);
+      const validationError = validateTriageDraft(draft, getTriageProfile(patient.department), patient.department);
       if (validationError) {
         pushToast(validationError);
         return;
@@ -904,6 +940,8 @@ export default function StaffDashboard({ user, onLogout }) {
                         const patient = selectedTriagePatient;
                         const draft = getTriageDraft(patient);
                         const triageReady = Boolean(triageReadyMap[patient.queueId] || patient.assessedAt);
+                        const triageProfile = getTriageProfile(patient.department);
+                        const isRequired = (field) => (triageProfile.required || []).includes(field);
                         return (
                           <section style={{ display: "grid", gap: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -925,31 +963,36 @@ export default function StaffDashboard({ user, onLogout }) {
                               </div>
                             ) : null}
 
+                            <div style={{ fontSize: 12, color: "#334155", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, padding: "7px 10px" }}>
+                              <strong>{patient.department} required:</strong>{" "}
+                              {(triageProfile.required || []).map((field) => TRIAGE_LABELS[field] || field).join(", ")}
+                            </div>
+
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(90px, 1fr))", gap: 8 }}>
                               <label style={fieldLabel}>
-                                <span>Temp (F)</span>
+                                <span>Temp (F){isRequired("temperature_f") ? " *" : ""}</span>
                                 <input value={draft.temperature_c ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "temperature_c", event.target.value)} placeholder="98.6" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
-                                <span>BP</span>
+                                <span>BP{isRequired("blood_pressure") ? " *" : ""}</span>
                                 <input value={draft.blood_pressure ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "blood_pressure", event.target.value)} placeholder="120/80" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
-                                <span>Pulse</span>
+                                <span>Pulse{isRequired("pulse_rate") ? " *" : ""}</span>
                                 <input value={draft.pulse_rate ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "pulse_rate", event.target.value)} placeholder="72" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
-                                <span>SpO2</span>
+                                <span>SpO2{isRequired("spo2") ? " *" : ""}</span>
                                 <input value={draft.spo2 ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "spo2", event.target.value)} placeholder="98" style={fieldInputCompact} />
                               </label>
                               <label style={fieldLabel}>
-                                <span>Weight</span>
+                                <span>Weight{isRequired("weight_kg") ? " *" : ""}</span>
                                 <input value={draft.weight_kg ?? ""} onChange={(event) => updateTriageDraft(patient.queueId, "weight_kg", event.target.value)} placeholder="60" style={fieldInputCompact} />
                               </label>
                             </div>
 
                             <label style={fieldLabel}>
-                              <span>Triage Notes</span>
+                              <span>Triage Notes{isRequired("triage_notes") ? " *" : ""}</span>
                               <textarea value={draft.triage_notes} onChange={(event) => updateTriageDraft(patient.queueId, "triage_notes", event.target.value)} rows={4} placeholder="Brief triage summary..." style={{ ...fieldInputCompact, resize: "vertical", minHeight: 100 }} />
                             </label>
 

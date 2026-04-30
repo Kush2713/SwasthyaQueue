@@ -10,6 +10,11 @@ const {
   getAssignedDepartmentIdsFromAuth,
 } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
+const {
+  getClinicalProfile,
+  getMissingRequiredFields,
+  formatMissingFieldNames,
+} = require("../utils/clinicalProfiles");
 
 async function getQueueDepartmentId(queueId) {
   const result = await pool.query(
@@ -771,6 +776,20 @@ const recordNurseTriage = async (req, res) => {
       return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
+    const clinicalProfile = getClinicalProfile(departmentId);
+    const missingFields = getMissingRequiredFields(clinicalProfile, {
+      temperature_f: temperatureF,
+      blood_pressure: bloodPressure || null,
+      pulse_rate: pulseRate,
+      spo2,
+      weight_kg: weightKg,
+      triage_notes: triageNotes || null,
+    });
+    if (missingFields.length) {
+      const labels = formatMissingFieldNames(missingFields).join(", ");
+      return res.status(400).json({ error: `${clinicalProfile.department} triage requires: ${labels}.` });
+    }
+
     const validationError = validateTriageVitals({
       temperatureF,
       pulseRate,
@@ -867,6 +886,20 @@ const markReadyForDoctor = async (req, res) => {
     }
     if (!hasDepartmentAccess(req.auth, departmentId)) {
       return res.status(403).json({ error: "You are not assigned to this department." });
+    }
+
+    const clinicalProfile = getClinicalProfile(departmentId);
+    const missingFields = getMissingRequiredFields(clinicalProfile, {
+      temperature_f: temperatureF,
+      blood_pressure: bloodPressure || null,
+      pulse_rate: pulseRate,
+      spo2,
+      weight_kg: weightKg,
+      triage_notes: triageNotes || null,
+    });
+    if (missingFields.length) {
+      const labels = formatMissingFieldNames(missingFields).join(", ");
+      return res.status(400).json({ error: `${clinicalProfile.department} triage requires: ${labels}.` });
     }
 
     const validationError = validateTriageVitals({
