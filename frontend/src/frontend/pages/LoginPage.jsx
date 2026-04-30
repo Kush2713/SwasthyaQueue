@@ -11,12 +11,6 @@ const labelStyle = "mb-1.5 block text-sm font-semibold text-slate-700";
 const inputStyle =
   "w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0050A8] focus:ring-2 focus:ring-[#0050A8]/20";
 
-const demoRows = [
-  { userId: "receptionist01", password: "sqrecp123" },
-  { userId: "nurse01", password: "sqnurse123" },
-  { userId: "doctor01", password: "sqdoc123" },
-];
-
 const signupDefaults = {
   name: "",
   age: "",
@@ -171,12 +165,6 @@ export default function LoginPage({ onLogin }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoAutofill = (demoUserId, demoPassword) => {
-    setStaffUserId(demoUserId);
-    setStaffPassword(demoPassword);
-    setError("");
   };
 
   return (
@@ -409,25 +397,8 @@ export default function LoginPage({ onLogin }) {
                     {loading ? "Signing In..." : "Sign In"}
                   </button>
 
-                  <div className="rounded-lg border border-slate-200 bg-[#F8FAFC] p-3.5">
-                    <h3 className="text-[11px] font-bold tracking-wide text-slate-600">ROLE DEMO CREDENTIALS</h3>
-                    <div className="mt-2 space-y-2">
-                      {demoRows.map(({ userId, password }) => (
-                        <button
-                          type="button"
-                          key={userId}
-                          onClick={() => handleDemoAutofill(userId, password)}
-                          className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-50"
-                        >
-                          <span className="font-mono text-xs text-slate-700">
-                            {userId} / {password}
-                          </span>
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            demo
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="rounded-lg border border-slate-200 bg-[#F8FAFC] px-3.5 py-3 text-xs text-slate-600">
+                    Demo credentials are intentionally hidden. Please use staff credentials shared by your admin/team.
                   </div>
                 </form>
               )}
