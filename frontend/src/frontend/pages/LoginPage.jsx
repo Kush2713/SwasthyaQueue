@@ -12,9 +12,9 @@ const inputStyle =
   "w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0050A8] focus:ring-2 focus:ring-[#0050A8]/20";
 
 const demoRows = [
-  { userId: "receptionist01", password: "recept123" },
-  { userId: "nurse01", password: "nurse123" },
-  { userId: "doctor01", password: "doc123" },
+  { userId: "receptionist01", password: "sqrecp123" },
+  { userId: "nurse01", password: "sqnurse123" },
+  { userId: "doctor01", password: "sqdoc123" },
 ];
 
 const signupDefaults = {
