@@ -259,10 +259,8 @@ export default function StaffDashboard({ user, onLogout }) {
         .filter(
           (patient) =>
             patient.rawStatus === "waiting"
-            && (
-              (patient.urgentReviewRequested && !patient.priorityHumanConfirmed)
-              || (patient.priorityHumanConfirmed && (patient.priority === "high" || patient.priority === "critical"))
-            )
+            && patient.urgentReviewRequested
+            && !patient.priorityHumanConfirmed
         )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]

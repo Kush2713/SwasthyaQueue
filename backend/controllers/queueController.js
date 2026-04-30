@@ -513,7 +513,8 @@ const approvePriorityOverride = async (req, res) => {
       `
         UPDATE queue
         SET priority_level = $2,
-            urgent_review_requested = TRUE,
+            urgent_review_requested = FALSE,
+            status = CASE WHEN status = 'waiting' THEN 'in-progress' ELSE status END,
             escalated_at = CURRENT_TIMESTAMP,
             escalated_by_role = $3,
             escalated_by_name = $4,
@@ -523,6 +524,16 @@ const approvePriorityOverride = async (req, res) => {
         RETURNING *
       `,
       [queueId, priorityLevel, escalatedByRole, escalatedByName, escalationNote || null]
+    );
+
+    await pool.query(
+      `
+        UPDATE appointments
+        SET status = CASE WHEN status = 'queued' THEN 'in-progress' ELSE status END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = $1
+      `,
+      [result.rows[0].appointment_id]
     );
 
     if (!result.rows.length) {
@@ -597,11 +608,27 @@ const confirmPrioritySuggestion = async (req, res) => {
     const updateResult = await pool.query(
       `
         UPDATE queue
-        SET priority_level = $2
+        SET priority_level = $2,
+            urgent_review_requested = FALSE,
+            status = CASE WHEN status = 'waiting' THEN 'in-progress' ELSE status END,
+            escalated_at = CURRENT_TIMESTAMP,
+            escalated_by_role = $3,
+            escalated_by_name = $4,
+            escalation_note = $5
         WHERE queue_id = $1
         RETURNING *
       `,
-      [queueId, finalPriority]
+      [queueId, finalPriority, actor.role || "nurse", actor.name || "Triage Nurse", note || null]
+    );
+
+    await pool.query(
+      `
+        UPDATE appointments
+        SET status = CASE WHEN status = 'queued' THEN 'in-progress' ELSE status END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = $1
+      `,
+      [current.appointment_id]
     );
 
     await logWorkflowEvent(pool, {
