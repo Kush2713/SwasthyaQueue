@@ -1,6 +1,6 @@
 const pool = require("../db");
 const { logWorkflowEvent } = require("../utils/audit");
-const { getActorFromRequest } = require("../middleware/authMiddleware");
+const { getActorFromRequest, getAssignedDepartmentIdsFromAuth } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
 const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
 
@@ -217,6 +217,8 @@ const lookupPatients = async (req, res) => {
     const digitsQuery = rawQuery.replace(/\D/g, "");
     const likeQuery = `%${rawQuery.toLowerCase()}%`;
     const likeDigitsQuery = `%${digitsQuery}%`;
+    const scopedDepartmentIds = getAssignedDepartmentIdsFromAuth(req.auth);
+    const shouldScopeByDepartment = ["nurse", "doctor"].includes(req.auth?.role) && scopedDepartmentIds.length > 0;
 
     const result = await pool.query(
       `
@@ -281,6 +283,18 @@ const lookupPatients = async (req, res) => {
           OR LOWER(p.name) LIKE $1
           OR LOWER(COALESCE(p.email, '')) LIKE $1
           OR LOWER(COALESCE(p.address, '')) LIKE $1
+          ${
+            shouldScopeByDepartment
+              ? `
+          AND EXISTS (
+            SELECT 1
+            FROM appointments a_scope
+            WHERE a_scope.patient_id = p.patient_id
+              AND a_scope.department_id = ANY($7::int[])
+          )
+          `
+              : ""
+          }
         ORDER BY
           CASE
             WHEN $2::bigint IS NOT NULL AND p.patient_id = $2::bigint THEN 0
@@ -304,6 +318,7 @@ const lookupPatients = async (req, res) => {
         likeDigitsQuery,
         rawQuery,
         HOSPITAL_TIMEZONE,
+        ...(shouldScopeByDepartment ? [scopedDepartmentIds] : []),
       ]
     );
 
@@ -334,9 +349,10 @@ const lookupPatients = async (req, res) => {
           JOIN departments d ON d.department_id = a.department_id
           LEFT JOIN queue q ON q.appointment_id = a.appointment_id
           WHERE a.patient_id = ANY($1::int[])
+            ${shouldScopeByDepartment ? "AND a.department_id = ANY($2::int[])" : ""}
           ORDER BY a.created_at DESC
         `,
-        [patientIds]
+        shouldScopeByDepartment ? [patientIds, scopedDepartmentIds] : [patientIds]
       );
 
       historyByPatientId = historyResult.rows.reduce((acc, row) => {

@@ -4,7 +4,11 @@ const {
   pool,
 } = require("../services/queueService");
 const { logWorkflowEvent } = require("../utils/audit");
-const { getActorFromRequest } = require("../middleware/authMiddleware");
+const {
+  getActorFromRequest,
+  hasDepartmentAccess,
+  getAssignedDepartmentIdsFromAuth,
+} = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
 
 function toNullableNumber(value) {
@@ -124,12 +128,23 @@ const addToQueue = async (req, res) => {
 // Get queue + estimated wait time
 const getQueueByDepartment = async (req, res) => {
   try {
-    const { department_id } = req.params;
+    const departmentId = Number(req.params.department_id);
+    if (!Number.isFinite(departmentId)) {
+      return res.status(400).json({ error: "Invalid department id." });
+    }
+
+    if (!hasDepartmentAccess(req.auth, departmentId)) {
+      return res.json([]);
+    }
 
     const dept = await pool.query(
       "SELECT name, avg_consult_time FROM departments WHERE department_id = $1",
-      [department_id]
+      [departmentId]
     );
+
+    if (!dept.rows.length) {
+      return res.status(404).json({ error: "Department not found." });
+    }
 
     const avgTime = dept.rows[0].avg_consult_time;
     const departmentName = dept.rows[0].name;
@@ -169,7 +184,7 @@ const getQueueByDepartment = async (req, res) => {
           AND q.status IN ('waiting', 'in-progress')
         ORDER BY priority_level ASC, token_number ASC
       `,
-      [department_id]
+      [departmentId]
     );
 
     const enhancedQueue = await Promise.all(result.rows.map(async (patient, index) => {
@@ -185,7 +200,7 @@ const getQueueByDepartment = async (req, res) => {
         ...patient,
         token_label: formatTokenLabel({
           departmentName,
-          departmentId: department_id,
+          departmentId,
           queueCreatedAt: patient.created_at,
           tokenNumber: patient.token_number,
         }),
@@ -392,9 +407,21 @@ const completePatient = async (req, res) => {
 // Stats
 const getStats = async (req, res) => {
   try {
-    const total = await pool.query("SELECT COUNT(*) FROM queue WHERE status != 'cancelled'");
-    const waiting = await pool.query("SELECT COUNT(*) FROM queue WHERE status = 'waiting'");
-    const completed = await pool.query("SELECT COUNT(*) FROM queue WHERE status = 'completed'");
+    const scopedDepartmentIds = getAssignedDepartmentIdsFromAuth(req.auth);
+    const shouldScope = ["nurse", "doctor"].includes(req.auth?.role) && scopedDepartmentIds.length > 0;
+
+    const total = await pool.query(
+      `SELECT COUNT(*) FROM queue WHERE status != 'cancelled' ${shouldScope ? "AND department_id = ANY($1::int[])" : ""}`,
+      shouldScope ? [scopedDepartmentIds] : []
+    );
+    const waiting = await pool.query(
+      `SELECT COUNT(*) FROM queue WHERE status = 'waiting' ${shouldScope ? "AND department_id = ANY($1::int[])" : ""}`,
+      shouldScope ? [scopedDepartmentIds] : []
+    );
+    const completed = await pool.query(
+      `SELECT COUNT(*) FROM queue WHERE status = 'completed' ${shouldScope ? "AND department_id = ANY($1::int[])" : ""}`,
+      shouldScope ? [scopedDepartmentIds] : []
+    );
 
     res.json({
       total_patients: parseInt(total.rows[0].count, 10),
