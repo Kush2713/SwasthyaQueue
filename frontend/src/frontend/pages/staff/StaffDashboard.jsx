@@ -259,8 +259,10 @@ export default function StaffDashboard({ user, onLogout }) {
         .filter(
           (patient) =>
             patient.rawStatus === "waiting"
-            && patient.urgentReviewRequested
-            && !patient.priorityHumanConfirmed
+            && (
+              (patient.urgentReviewRequested && !patient.priorityHumanConfirmed)
+              || (patient.priorityHumanConfirmed && (patient.priority === "high" || patient.priority === "critical"))
+            )
         )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
@@ -271,9 +273,8 @@ export default function StaffDashboard({ user, onLogout }) {
       patients
         .filter(
           (patient) =>
-            ["waiting", "in-progress"].includes(patient.rawStatus)
-            && patient.appointmentStatus !== "ready-for-doctor"
-            && patient.appointmentStatus !== "completed"
+            patient.rawStatus === "in-progress"
+            && !["ready-for-doctor", "completed"].includes(patient.appointmentStatus)
         )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
