@@ -1,12 +1,14 @@
 const { verifyAuthToken } = require("../utils/auth");
 const { getStaffUserById } = require("../utils/staffUsers");
+const { getStaffAccountByUserId } = require("../utils/staffAccounts");
+const pool = require("../db");
 
 function getBearerToken(req) {
   const authHeader = req.headers.authorization || "";
   return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const token = getBearerToken(req);
   const payload = verifyAuthToken(token);
 
@@ -15,8 +17,18 @@ function requireAuth(req, res, next) {
   }
 
   if (payload.role !== "patient") {
-    const staffUser = getStaffUserById(payload.user_id);
-    if (!staffUser || staffUser.role !== payload.role) {
+    try {
+      const staffUser = await getStaffAccountByUserId(pool, payload.user_id);
+      if (staffUser?.active && staffUser.role === payload.role) {
+        req.auth = payload;
+        return next();
+      }
+    } catch (error) {
+      console.error("DB staff auth validation failed, trying fallback:", error.message);
+    }
+
+    const legacyStaff = getStaffUserById(payload.user_id);
+    if (!legacyStaff || legacyStaff.role !== payload.role) {
       return res.status(401).json({ error: "Authentication required" });
     }
   }

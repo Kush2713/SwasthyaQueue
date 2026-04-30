@@ -37,6 +37,32 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff_accounts (
+      staff_id SERIAL PRIMARY KEY,
+      user_id VARCHAR(80) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor', 'admin')),
+      name VARCHAR(120) NOT NULL,
+      designation VARCHAR(120),
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff_department_assignments (
+      assignment_id SERIAL PRIMARY KEY,
+      staff_id INTEGER NOT NULL REFERENCES staff_accounts(staff_id) ON DELETE CASCADE,
+      department_id INTEGER NOT NULL REFERENCES departments(department_id) ON DELETE CASCADE,
+      is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (staff_id, department_id)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS appointments (
       appointment_id SERIAL PRIMARY KEY,
       patient_id INTEGER NOT NULL REFERENCES patients(patient_id) ON DELETE CASCADE,
@@ -125,6 +151,21 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_staff_accounts_role_active
+    ON staff_accounts (role, active)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_staff_department_assignments_staff_active
+    ON staff_department_assignments (staff_id, active)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_staff_department_assignments_department_active
+    ON staff_department_assignments (department_id, active)
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_workflow_events_patient_created
     ON workflow_events (patient_id, created_at DESC)
   `);
@@ -139,6 +180,32 @@ async function ensureSchema() {
       ON appointments (patient_id)
       WHERE status IN ('booked', 'queued', 'ready-for-doctor', 'in-progress')
     `);
+
+  await pool.query(`
+    INSERT INTO staff_accounts (user_id, password_hash, role, name, designation, active)
+    VALUES
+      ('receptionist01', 'recept123', 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
+      ('nurse01', 'nurse123', 'nurse', 'Sujatha Rao', 'Nurse | Triage', TRUE),
+      ('doctor01', 'doc123', 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE)
+    ON CONFLICT (user_id) DO UPDATE
+    SET role = EXCLUDED.role,
+        name = EXCLUDED.name,
+        designation = EXCLUDED.designation,
+        active = TRUE,
+        updated_at = CURRENT_TIMESTAMP
+  `);
+
+  await pool.query(`
+    INSERT INTO staff_department_assignments (staff_id, department_id, is_primary, active)
+    SELECT s.staff_id, d.department_id, TRUE, TRUE
+    FROM staff_accounts s
+    JOIN departments d ON
+      (s.user_id = 'doctor01' AND d.name = 'General Medicine')
+      OR (s.user_id = 'nurse01' AND d.name = 'General Medicine')
+      OR (s.user_id = 'receptionist01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
+    ON CONFLICT (staff_id, department_id) DO UPDATE
+    SET active = TRUE
+  `);
   }
 
 module.exports = { ensureSchema };

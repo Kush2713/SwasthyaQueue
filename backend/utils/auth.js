@@ -34,9 +34,12 @@ function issueAuthToken(user) {
     sub: user.accountId || user.userId,
     account_id: user.accountId || null,
     patient_id: user.patientId || null,
+    staff_id: user.staffId || null,
     user_id: user.userId || null,
     name: user.name || "",
     designation: user.designation || "",
+    assigned_department_ids: Array.isArray(user.assignedDepartmentIds) ? user.assignedDepartmentIds : null,
+    primary_department_id: Number.isFinite(user.primaryDepartmentId) ? user.primaryDepartmentId : null,
     role: user.role || "patient",
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
   };

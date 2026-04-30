@@ -10,6 +10,7 @@ const {
   normalizeMobile,
 } = require("../utils/auth");
 const { getStaffUserByCredentials, getStaffUserById, sanitizeStaffUser } = require("../utils/staffUsers");
+const { getStaffAccountByCredentials, getStaffAccountByUserId, sanitizeStaffAccount } = require("../utils/staffAccounts");
 const { logWorkflowEvent } = require("../utils/audit");
 
 function sanitizePatientUser(row, token) {
@@ -394,17 +395,43 @@ async function verifyPatientOtp(req, res) {
 }
 
 async function loginStaff(req, res) {
-  const matchedUser = getStaffUserByCredentials(req.body.userId, req.body.password);
+  let matchedUser = null;
+  let source = "db";
+
+  try {
+    matchedUser = await getStaffAccountByCredentials(pool, req.body.userId, req.body.password);
+  } catch (error) {
+    console.error("DB staff auth lookup failed, trying fallback:", error.message);
+  }
+
+  if (!matchedUser) {
+    const legacy = getStaffUserByCredentials(req.body.userId, req.body.password);
+    if (legacy) {
+      source = "legacy";
+      matchedUser = {
+        staffId: null,
+        userId: legacy.userId,
+        role: legacy.role,
+        name: legacy.name,
+        designation: legacy.designation,
+        assignedDepartmentIds: [],
+        primaryDepartmentId: null,
+      };
+    }
+  }
 
   if (!matchedUser) {
     return res.status(401).json({ error: "Invalid staff credentials." });
   }
 
   const token = issueAuthToken({
+    staffId: matchedUser.staffId,
     userId: matchedUser.userId,
     role: matchedUser.role,
     name: matchedUser.name,
     designation: matchedUser.designation,
+    assignedDepartmentIds: matchedUser.assignedDepartmentIds || [],
+    primaryDepartmentId: matchedUser.primaryDepartmentId,
   });
 
   await logWorkflowEvent(pool, {
@@ -416,24 +443,42 @@ async function loginStaff(req, res) {
     action: "staff_login",
     entityType: "staff_user",
     entityId: matchedUser.userId,
-    details: { designation: matchedUser.designation },
+    details: {
+      designation: matchedUser.designation,
+      source,
+      assignedDepartmentIds: matchedUser.assignedDepartmentIds || [],
+    },
   });
 
   res.json({
     message: "Staff login successful.",
-    user: sanitizeStaffUser(matchedUser, token),
+    user: source === "db"
+      ? sanitizeStaffAccount(matchedUser, token)
+      : sanitizeStaffUser(matchedUser, token),
   });
 }
 
 async function getCurrentSession(req, res) {
   if (req.auth.role !== "patient") {
-    const staffUser = getStaffUserById(req.auth.user_id);
-    if (!staffUser) {
+    const token = req.headers.authorization?.slice(7);
+    try {
+      const dbStaff = await getStaffAccountByUserId(pool, req.auth.user_id);
+      if (dbStaff && dbStaff.active) {
+        return res.json({
+          user: sanitizeStaffAccount(dbStaff, token),
+        });
+      }
+    } catch (error) {
+      console.error("DB staff session lookup failed, trying fallback:", error.message);
+    }
+
+    const legacyStaff = getStaffUserById(req.auth.user_id);
+    if (!legacyStaff) {
       return res.status(404).json({ error: "Staff user not found." });
     }
 
     return res.json({
-      user: sanitizeStaffUser(staffUser, req.headers.authorization?.slice(7)),
+      user: sanitizeStaffUser(legacyStaff, token),
     });
   }
 

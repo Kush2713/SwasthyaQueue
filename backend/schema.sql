@@ -40,6 +40,28 @@ CREATE TABLE IF NOT EXISTS patient_accounts (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS staff_accounts (
+  staff_id SERIAL PRIMARY KEY,
+  user_id VARCHAR(80) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor', 'admin')),
+  name VARCHAR(120) NOT NULL,
+  designation VARCHAR(120),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS staff_department_assignments (
+  assignment_id SERIAL PRIMARY KEY,
+  staff_id INTEGER NOT NULL REFERENCES staff_accounts(staff_id) ON DELETE CASCADE,
+  department_id INTEGER NOT NULL REFERENCES departments(department_id) ON DELETE CASCADE,
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (staff_id, department_id)
+);
+
 CREATE TABLE IF NOT EXISTS appointments (
   appointment_id SERIAL PRIMARY KEY,
   patient_id INTEGER NOT NULL REFERENCES patients(patient_id) ON DELETE CASCADE,
@@ -116,6 +138,15 @@ CREATE INDEX IF NOT EXISTS idx_queue_priority_token
 
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_created
   ON appointments (patient_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_staff_accounts_role_active
+  ON staff_accounts (role, active);
+
+CREATE INDEX IF NOT EXISTS idx_staff_department_assignments_staff_active
+  ON staff_department_assignments (staff_id, active);
+
+CREATE INDEX IF NOT EXISTS idx_staff_department_assignments_department_active
+  ON staff_department_assignments (department_id, active);
 
 CREATE INDEX IF NOT EXISTS idx_workflow_events_patient_created
   ON workflow_events (patient_id, created_at DESC);
