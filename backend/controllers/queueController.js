@@ -513,7 +513,7 @@ const approvePriorityOverride = async (req, res) => {
       `
         UPDATE queue
         SET priority_level = $2,
-            urgent_review_requested = FALSE,
+            urgent_review_requested = TRUE,
             escalated_at = CURRENT_TIMESTAMP,
             escalated_by_role = $3,
             escalated_by_name = $4,

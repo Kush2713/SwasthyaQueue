@@ -312,7 +312,11 @@ export default function StaffDashboard({ user, onLogout }) {
   const doctorPatients = useMemo(
     () =>
       patients
-        .filter((patient) => patient.appointmentStatus === "ready-for-doctor" || patient.rawStatus === "in-progress")
+        .filter((patient) =>
+          patient.appointmentStatus === "ready-for-doctor"
+          || patient.rawStatus === "in-progress"
+          || (patient.urgentReviewRequested && patient.priority === "critical" && patient.rawStatus === "waiting")
+        )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
@@ -978,7 +982,7 @@ export default function StaffDashboard({ user, onLogout }) {
               <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 10, alignItems: "start" }}>
                 <Card title="Patients For Consultation" count={doctorPatients.length}>
                   {doctorPatients.length ? (
-                    <div style={{ display: "grid", gap: 8, maxHeight: 560, overflowY: "auto" }}>
+                    <div style={{ display: "grid", gap: 8 }}>
                       {doctorPatients.map((patient) => (
                         <button
                           key={patient.queueId}
