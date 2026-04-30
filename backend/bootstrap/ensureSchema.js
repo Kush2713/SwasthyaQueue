@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { hashStaffPassword } = require("../utils/staffAccounts");
 
 async function ensureSchema() {
   await pool.query(`
@@ -184,16 +185,22 @@ async function ensureSchema() {
   await pool.query(`
     INSERT INTO staff_accounts (user_id, password_hash, role, name, designation, active)
     VALUES
-      ('receptionist01', 'recept123', 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
-      ('nurse01', 'nurse123', 'nurse', 'Sujatha Rao', 'Nurse | Triage', TRUE),
-      ('doctor01', 'doc123', 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE)
+      ('receptionist01', $1, 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
+      ('nurse01', $2, 'nurse', 'Sujatha Rao', 'Nurse | Triage', TRUE),
+      ('doctor01', $3, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
+      ('admin01', $4, 'admin', 'System Admin', 'Platform Admin', TRUE)
     ON CONFLICT (user_id) DO UPDATE
     SET role = EXCLUDED.role,
         name = EXCLUDED.name,
         designation = EXCLUDED.designation,
         active = TRUE,
         updated_at = CURRENT_TIMESTAMP
-  `);
+  `, [
+    hashStaffPassword("recept123"),
+    hashStaffPassword("nurse123"),
+    hashStaffPassword("doc123"),
+    hashStaffPassword("admin123"),
+  ]);
 
   await pool.query(`
     INSERT INTO staff_department_assignments (staff_id, department_id, is_primary, active)
@@ -202,6 +209,7 @@ async function ensureSchema() {
     JOIN departments d ON
       (s.user_id = 'doctor01' AND d.name = 'General Medicine')
       OR (s.user_id = 'nurse01' AND d.name = 'General Medicine')
+      OR (s.user_id = 'admin01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
       OR (s.user_id = 'receptionist01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
     ON CONFLICT (staff_id, department_id) DO UPDATE
     SET active = TRUE
