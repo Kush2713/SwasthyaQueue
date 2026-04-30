@@ -186,9 +186,17 @@ async function ensureSchema() {
     INSERT INTO staff_accounts (user_id, password_hash, role, name, designation, active)
     VALUES
       ('receptionist01', $1, 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
-      ('nurse01', $2, 'nurse', 'Sujatha Rao', 'Nurse | Triage', TRUE),
-      ('doctor01', $3, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
-      ('admin01', $4, 'admin', 'System Admin', 'Platform Admin', TRUE)
+      ('nurse01', $2, 'nurse', 'Sujatha Rao', 'Nurse | General Medicine', TRUE),
+      ('nurse_cardio01', $3, 'nurse', 'Nurse Cardiology', 'Nurse | Cardiology', TRUE),
+      ('nurse_ortho01', $4, 'nurse', 'Nurse Orthopedics', 'Nurse | Orthopedics', TRUE),
+      ('nurse_pedia01', $5, 'nurse', 'Nurse Pediatrics', 'Nurse | Pediatrics', TRUE),
+      ('nurse_emg01', $6, 'nurse', 'Nurse Emergency', 'Nurse | Emergency', TRUE),
+      ('doctor01', $7, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
+      ('doctor_cardio01', $8, 'doctor', 'Dr. Cardiology', 'Doctor | Cardiology', TRUE),
+      ('doctor_ortho01', $9, 'doctor', 'Dr. Orthopedics', 'Doctor | Orthopedics', TRUE),
+      ('doctor_pedia01', $10, 'doctor', 'Dr. Pediatrics', 'Doctor | Pediatrics', TRUE),
+      ('doctor_emg01', $11, 'doctor', 'Doctor Emergency', 'Doctor | Emergency', TRUE),
+      ('admin01', $12, 'admin', 'System Admin', 'Platform Admin', TRUE)
     ON CONFLICT (user_id) DO UPDATE
     SET password_hash = EXCLUDED.password_hash,
         role = EXCLUDED.role,
@@ -199,6 +207,14 @@ async function ensureSchema() {
   `, [
     hashStaffPassword("sqrecp123"),
     hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqdoc123"),
+    hashStaffPassword("sqdoc123"),
+    hashStaffPassword("sqdoc123"),
+    hashStaffPassword("sqdoc123"),
     hashStaffPassword("sqdoc123"),
     hashStaffPassword("admin123"),
   ]);
@@ -209,7 +225,15 @@ async function ensureSchema() {
     FROM staff_accounts s
     JOIN departments d ON
       (s.user_id = 'doctor01' AND d.name = 'General Medicine')
+      OR (s.user_id = 'doctor_cardio01' AND d.name = 'Cardiology')
+      OR (s.user_id = 'doctor_ortho01' AND d.name = 'Orthopedics')
+      OR (s.user_id = 'doctor_pedia01' AND d.name = 'Pediatrics')
+      OR (s.user_id = 'doctor_emg01' AND d.name = 'Emergency')
       OR (s.user_id = 'nurse01' AND d.name = 'General Medicine')
+      OR (s.user_id = 'nurse_cardio01' AND d.name = 'Cardiology')
+      OR (s.user_id = 'nurse_ortho01' AND d.name = 'Orthopedics')
+      OR (s.user_id = 'nurse_pedia01' AND d.name = 'Pediatrics')
+      OR (s.user_id = 'nurse_emg01' AND d.name = 'Emergency')
       OR (s.user_id = 'admin01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
       OR (s.user_id = 'receptionist01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
     ON CONFLICT (staff_id, department_id) DO UPDATE

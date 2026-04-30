@@ -118,13 +118,13 @@ async function main() {
 
   console.log("\n4) Staff login");
   const receptionist = await api("post", "/api/auth/staff/login", {
-    data: { userId: "receptionist01", password: "recept123" },
+    data: { userId: "receptionist01", password: "sqrecp123" },
   });
   const nurse = await api("post", "/api/auth/staff/login", {
-    data: { userId: "nurse01", password: "nurse123" },
+    data: { userId: "nurse01", password: "sqnurse123" },
   });
   const doctor = await api("post", "/api/auth/staff/login", {
-    data: { userId: "doctor01", password: "doc123" },
+    data: { userId: "doctor01", password: "sqdoc123" },
   });
   const receptionistToken = receptionist?.user?.authToken;
   const nurseToken = nurse?.user?.authToken;
