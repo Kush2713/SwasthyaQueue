@@ -264,7 +264,12 @@ export default function StaffDashboard({ user, onLogout }) {
   const triagePatients = useMemo(
     () =>
       patients
-        .filter((patient) => patient.rawStatus === "in-progress" && patient.appointmentStatus !== "ready-for-doctor")
+        .filter(
+          (patient) =>
+            ["waiting", "in-progress"].includes(patient.rawStatus)
+            && patient.appointmentStatus !== "ready-for-doctor"
+            && patient.appointmentStatus !== "completed"
+        )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
