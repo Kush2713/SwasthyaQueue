@@ -60,6 +60,14 @@ function normalizeStatus(status) {
   return status || "-";
 }
 
+function getAllowedDepartmentIds(user) {
+  const source = user?.assignedDepartmentIds ?? user?.assigned_department_ids ?? [];
+  const ids = Array.isArray(source)
+    ? source.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : [];
+  return Array.from(new Set(ids));
+}
+
 export default function ReceptionDashboard({ user, onLogout }) {
   const navigate = useNavigate();
   const [clock, setClock] = useState("");
@@ -84,6 +92,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   });
   const [assistedState, setAssistedState] = useState({ loading: false, error: "", success: null });
   const [activeOverlay, setActiveOverlay] = useState("");
+  const allowedDepartmentIds = useMemo(() => getAllowedDepartmentIds(user), [user]);
   const [quickIntakeForm, setQuickIntakeForm] = useState({
     name: "",
     age: "",
@@ -99,7 +108,10 @@ export default function ReceptionDashboard({ user, onLogout }) {
 
     try {
       const { getDepartments, getQueueByDepartment, normalizePriority } = await import("../../lib/api");
-      const departmentRows = await getDepartments();
+      const allDepartments = await getDepartments();
+      const departmentRows = allowedDepartmentIds.length
+        ? allDepartments.filter((department) => allowedDepartmentIds.includes(Number(department.department_id)))
+        : allDepartments;
       const queueByDepartment = await Promise.all(
         departmentRows.map(async (department) => ({
           department,
@@ -155,7 +167,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
       setLoadError(err.message || "Unable to load the receptionist console right now.");
       setScreenState("error");
     }
-  }, []);
+  }, [allowedDepartmentIds]);
 
   useEffect(() => {
     setClock(clockText());

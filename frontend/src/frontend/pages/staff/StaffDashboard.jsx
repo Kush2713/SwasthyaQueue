@@ -82,6 +82,14 @@ function validateTriageDraft(draft) {
   return "";
 }
 
+function getAllowedDepartmentIds(user) {
+  const source = user?.assignedDepartmentIds ?? user?.assigned_department_ids ?? [];
+  const ids = Array.isArray(source)
+    ? source.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : [];
+  return Array.from(new Set(ids));
+}
+
 export default function StaffDashboard({ user, onLogout }) {
   const navigate = useNavigate();
   const isNurse = user?.role === "nurse";
@@ -105,13 +113,17 @@ export default function StaffDashboard({ user, onLogout }) {
   const [selectedDoctorQueueId, setSelectedDoctorQueueId] = useState(null);
   const [doctorCaseMap, setDoctorCaseMap] = useState({});
   const [doctorCaseLoading, setDoctorCaseLoading] = useState(false);
+  const allowedDepartmentIds = useMemo(() => getAllowedDepartmentIds(user), [user]);
 
   const loadDashboardData = useCallback(async () => {
     setLoadError("");
 
     try {
       const { getDepartments, getQueueByDepartment, getQueueStats, normalizePriority } = await import("../../lib/api");
-      const departmentRows = await getDepartments();
+      const allDepartments = await getDepartments();
+      const departmentRows = allowedDepartmentIds.length
+        ? allDepartments.filter((department) => allowedDepartmentIds.includes(Number(department.department_id)))
+        : allDepartments;
       const queueLists = await Promise.all(
         departmentRows.map(async (department) => ({
           department,
@@ -177,7 +189,7 @@ export default function StaffDashboard({ user, onLogout }) {
       setLoadError(error.message || "Unable to load staff queue details right now.");
       setScreenState("error");
     }
-  }, []);
+  }, [allowedDepartmentIds]);
 
   useEffect(() => {
     setClock(clockText());
