@@ -113,6 +113,8 @@ SwasthyaQueue aims to improve that by giving:
 - display screen / lobby queue board
 - formatted token labels (`GEN-YYYY-MM-DD-###`) for clarity across departments
 - stale queue auto-closure housekeeping job
+- DB-backed staff accounts and department assignments
+- admin APIs for staff assignment management and password reset
 - backend + PostgreSQL integration
 - backend + ML integration
 - local development support
@@ -120,9 +122,8 @@ SwasthyaQueue aims to improve that by giving:
 
 ### Still not production-complete
 
-- strict backend authorization per role
 - real OTP delivery over SMS/email
-- audit trail for each operational change
+- full admin UI for assignment/password operations (APIs are ready)
 - doctor tests/orders workflow
 - revisit / follow-up scheduling workflow
 - absent / recall / transfer-department flow
@@ -246,6 +247,9 @@ AUTH_TOKEN_SECRET=change_this_to_a_long_random_secret
 HOSPITAL_TIMEZONE=Asia/Kolkata
 QUEUE_HOUSEKEEPING_ENABLED=true
 QUEUE_HOUSEKEEPING_INTERVAL_MINUTES=15
+PG_SSL_REJECT_UNAUTHORIZED=false
+OPD_START_TIME=09:30
+OPD_END_TIME=21:30
 ```
 
 ### Frontend
@@ -312,6 +316,9 @@ Main routes:
 - `POST /api/auth/patient/verify-otp`
 - `GET /api/auth/me`
 - `POST /api/auth/staff/patient-account`
+- `GET /api/auth/admin/staff`
+- `PUT /api/auth/admin/staff/:staff_id/assignments`
+- `PUT /api/auth/admin/staff/:staff_id/password`
 
 ### Patients
 
@@ -371,6 +378,12 @@ Main routes:
 5. Doctor opens consultation workspace.
 6. Doctor records diagnosis and advice.
 7. Doctor completes visit.
+
+Operational validation notes:
+
+- Same-day booking is allowed if slot is in the future (from next hour onward) and within OPD hours.
+- Nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`.
+- Staff read/write visibility is scoped by assigned departments.
 
 ## Workflow Summary
 

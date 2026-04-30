@@ -7,6 +7,7 @@ This document explains how each role is expected to use the system.
 1. Patient signs up using mobile/email and OTP.
 2. Patient lands on the dashboard.
 3. Patient books a visit by entering current symptoms.
+   - same-day slot is allowed only if it is in the future (next hour onward) and within OPD hours
 4. Patient reviews and confirms.
 5. Token is generated.
 6. Patient tracks queue state on dashboard.
@@ -31,6 +32,7 @@ Main actions:
 - assisted account creation
 - open patient case
 - urgent review flagging
+- department-scoped operations based on receptionist assignment map
 
 ### Normal desk flow
 
@@ -66,6 +68,7 @@ Main actions:
 - record triage notes
 - approve high / critical escalation
 - mark ready for doctor
+- triage fields required by department profile (for example Pediatrics requires weight)
 
 ### Intended nurse flow
 
@@ -78,6 +81,7 @@ Main actions:
    - SpO2
    - weight
 4. Add triage notes.
+   - if queue is still `waiting`, triage is blocked until reception calls patient (must be `in-progress`)
 5. Escalate if required.
 6. Mark patient ready for doctor.
 
@@ -99,6 +103,7 @@ Main actions:
 - record diagnosis
 - record prescription/advice
 - complete visit
+- department-scoped consultation list based on doctor assignment map
 
 ### Intended doctor flow
 

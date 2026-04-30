@@ -10,15 +10,7 @@ No auto-seeding is required.
 Run from [backend](/D:/Study/Learning/Projects/SwasthyaQueue/backend):
 
 ```powershell
-$script = @'
-const pool = require("./db");
-(async () => {
-  await pool.query("TRUNCATE TABLE workflow_events, queue, appointments, patient_accounts, patients RESTART IDENTITY CASCADE");
-  console.log("Local operational data cleared.");
-  await pool.end();
-})().catch(async (e) => { console.error(e.message); process.exit(1); });
-'@;
-node -e $script
+npm.cmd run empty-run
 ```
 
 ## 1. Shared Execution Pattern (Use For Every Case)

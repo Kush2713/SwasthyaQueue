@@ -17,6 +17,13 @@ Run-state helpers (from `backend/`) for demos:
 - `npm.cmd run complete-run` -> load full baseline + rush demo dataset
 - `npm.cmd run test:e2e:smoke` -> automated API workflow verification
 
+Current hardening highlights (already implemented):
+
+- department-scoped staff visibility and write authorization
+- department-specific nurse triage required fields
+- stable queue workflow guards (clear 409 errors for wrong-state actions)
+- same-day preferred-slot booking support (future slot + OPD window rules)
+
 ### [WORKFLOWS.md](WORKFLOWS.md)
 
 Use this when you want the operational flow.

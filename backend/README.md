@@ -108,8 +108,11 @@ Core tables used by the backend:
 - `departments`
 - `patients`
 - `patient_accounts`
+- `staff_accounts`
+- `staff_department_assignments`
 - `appointments`
 - `queue`
+- `workflow_events`
 
 High-level relationship:
 
@@ -195,6 +198,9 @@ Hosted setups can use:
 - `POST /api/auth/patient/verify-otp`
 - `GET /api/auth/me`
 - `POST /api/auth/staff/patient-account`
+- `GET /api/auth/admin/staff`
+- `PUT /api/auth/admin/staff/:staff_id/assignments`
+- `PUT /api/auth/admin/staff/:staff_id/password`
 
 ### Patients
 
@@ -261,6 +267,12 @@ Hosted setups can use:
 - doctor notes
 - complete visit
 
+### Admin
+
+- list staff accounts with department assignments
+- assign active departments and set primary department
+- reset staff passwords
+
 ## Practical Notes
 
 - quick intake is intentionally fast and minimal
@@ -270,10 +282,13 @@ Hosted setups can use:
 - patient-facing queue status updates are consumed by frontend polling
 - frontend validation exists for better UX, but backend validates again for safety
 - `OTP_PREVIEW_ENABLED` is only for demo/local testing and should be disabled in production-like use
+- staff passwords support hashed storage (`pbkdf2`) with legacy plain-text auto-upgrade on successful login
+- OTP expiry validation is DB-time based (`CURRENT_TIMESTAMP`) to avoid timezone drift bugs
+- same-day booking is allowed only for future slots (next hour onward) and within OPD window
+- nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`
 
 ## Future Backend Improvements
 
-- strict role-based authorization for receptionist, nurse, and doctor roles
 - audit logs for every queue state change
 - absent / recall / transfer-department endpoints
 - doctor test orders and follow-up endpoints

@@ -63,6 +63,7 @@ Reception can:
 - call next
 - open case page
 - flag urgent review
+- view only assigned departments (from staff assignment)
 
 ### Nurse
 
@@ -78,6 +79,7 @@ Nurse can:
 - add triage notes
 - approve urgency escalation
 - mark ready for doctor
+- triage fields adapt to department-required clinical inputs
 
 ### Doctor
 
@@ -94,6 +96,7 @@ Doctor can:
 - add prescription/advice
 - add doctor notes
 - complete visit
+- sees only assigned-department consultation queue
 
 ### Display / Lobby
 
@@ -202,6 +205,7 @@ NEXT_PUBLIC_OPD_SLOT_INTERVAL_MINUTES=30
 - the API layer in `src/frontend/lib/api.js` centralizes backend communication
 - the case page acts as the shared patient/visit view across roles
 - patient profile flow now uses a single contact field (mobile) in booking/signup UX
+- staff dashboards are scoped by `assignedDepartmentIds` from authenticated session
 
 ## Practical Notes
 
