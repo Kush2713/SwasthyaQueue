@@ -35,6 +35,19 @@ function toNullableNumber(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+async function getQueueState(queueId) {
+  const result = await pool.query(
+    `
+      SELECT queue_id, status, appointment_id
+      FROM queue
+      WHERE queue_id = $1
+      LIMIT 1
+    `,
+    [queueId]
+  );
+  return result.rows[0] || null;
+}
+
 function toFahrenheitFromCelsius(value) {
   if (value === null) return null;
   return Number(((value * 9) / 5 + 32).toFixed(1));
@@ -768,10 +781,18 @@ const recordNurseTriage = async (req, res) => {
       return res.status(400).json({ error: "Assessed by name is required." });
     }
 
-    const departmentId = await getQueueDepartmentId(queueId);
-    if (!departmentId) {
-      return res.status(404).json({ error: "Active appointment not found for triage." });
+    const queueState = await getQueueState(queueId);
+    if (!queueState) {
+      return res.status(404).json({ error: "Queue entry not found for triage." });
     }
+    if (queueState.status !== "in-progress") {
+      return res.status(409).json({
+        error: `Queue is currently '${queueState.status}'. Reception must call the patient before triage.`,
+        queue_status: queueState.status,
+      });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
     if (!hasDepartmentAccess(req.auth, departmentId)) {
       return res.status(403).json({ error: "You are not assigned to this department." });
     }
@@ -880,10 +901,18 @@ const markReadyForDoctor = async (req, res) => {
       return res.status(400).json({ error: "Invalid queue id." });
     }
 
-    const departmentId = await getQueueDepartmentId(queueId);
-    if (!departmentId) {
-      return res.status(404).json({ error: "Active appointment not found for doctor handoff." });
+    const queueState = await getQueueState(queueId);
+    if (!queueState) {
+      return res.status(404).json({ error: "Queue entry not found for doctor handoff." });
     }
+    if (queueState.status !== "in-progress") {
+      return res.status(409).json({
+        error: `Queue is currently '${queueState.status}'. Triage handoff is allowed only after patient is in progress.`,
+        queue_status: queueState.status,
+      });
+    }
+
+    const departmentId = await getQueueDepartmentId(queueId);
     if (!hasDepartmentAccess(req.auth, departmentId)) {
       return res.status(403).json({ error: "You are not assigned to this department." });
     }

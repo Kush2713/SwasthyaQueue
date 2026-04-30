@@ -39,6 +39,20 @@ function getTimeZoneDateParts(value, timeZone) {
   };
 }
 
+function getTimeZoneTimeParts(value, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(value);
+  const bag = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    hour: Number(bag.hour),
+    minute: Number(bag.minute),
+  };
+}
+
 function datePartsToKey(parts) {
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
@@ -97,20 +111,28 @@ function normalizePreferredSlot(preferredSlot) {
   }
 
   const slotDateKey = datePartsToKey(getTimeZoneDateParts(parsed, HOSPITAL_TIMEZONE));
-  const todayDateKey = datePartsToKey(getTimeZoneDateParts(new Date(), HOSPITAL_TIMEZONE));
+  const now = new Date();
+  const todayDateKey = datePartsToKey(getTimeZoneDateParts(now, HOSPITAL_TIMEZONE));
+  const slotTime = getTimeZoneTimeParts(parsed, HOSPITAL_TIMEZONE);
+  const nowTime = getTimeZoneTimeParts(now, HOSPITAL_TIMEZONE);
 
-  if (slotDateKey <= todayDateKey) {
-    throw new Error("Preferred slot must be on a date after today.");
+  if (slotDateKey < todayDateKey) {
+    throw new Error("Preferred slot cannot be in the past.");
   }
 
-  const hours = parsed.getHours();
-  const minutes = parsed.getMinutes();
-  const totalMinutes = hours * 60 + minutes;
+  const totalMinutes = slotTime.hour * 60 + slotTime.minute;
   const opdStart = OPD_START_MINUTES;
   const opdEnd = OPD_END_MINUTES;
 
   if (totalMinutes < opdStart || totalMinutes > opdEnd) {
     throw new Error(`Preferred slot must be within OPD hours: ${OPD_START_TEXT} to ${OPD_END_TEXT}.`);
+  }
+
+  if (slotDateKey === todayDateKey) {
+    const nextHourMinutes = (nowTime.hour + 1) * 60;
+    if (totalMinutes < nextHourMinutes) {
+      throw new Error("For today, please choose a slot from the next hour onward.");
+    }
   }
 
   return parsed.toISOString();

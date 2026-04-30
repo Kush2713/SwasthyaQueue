@@ -320,6 +320,7 @@ async function verifyPatientOtp(req, res) {
           pa.email,
           pa.otp_hash,
           pa.otp_expires_at,
+          (pa.otp_expires_at IS NOT NULL AND pa.otp_expires_at >= CURRENT_TIMESTAMP) AS otp_valid_now,
           p.name,
           p.age,
           p.gender,
@@ -349,7 +350,7 @@ async function verifyPatientOtp(req, res) {
       return res.status(401).json({ error: "Invalid OTP. Please try again." });
     }
 
-    if (new Date(account.otp_expires_at).getTime() < Date.now()) {
+    if (!account.otp_valid_now) {
       return res.status(401).json({ error: "OTP has expired. Request a new one." });
     }
 

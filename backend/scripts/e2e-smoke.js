@@ -22,6 +22,10 @@ function authHeader(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function api(method, path, { token, data } = {}) {
   const response = await axios({
     method,
@@ -129,10 +133,22 @@ async function main() {
   console.log("✅ Staff sessions created");
 
   console.log("\n5) Reception calls next");
-  await api("post", "/api/queue/next", {
-    token: receptionistToken,
-    data: { department_id: 1 },
-  });
+  let targetInProgress = false;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await api("post", "/api/queue/next", {
+      token: receptionistToken,
+      data: { department_id: 1 },
+    });
+
+    const deptQueueCheck = await api("get", "/api/queue/1");
+    const target = (deptQueueCheck || []).find((row) => row.queue_id === queueId);
+    if (target?.status === "in-progress") {
+      targetInProgress = true;
+      break;
+    }
+    await sleep(200);
+  }
+  assert(targetInProgress, "Could not bring smoke appointment to in-progress after repeated call-next.");
   console.log("✅ Reception call-next done");
 
   console.log("\n6) Nurse triage + ready-for-doctor");
@@ -201,4 +217,3 @@ async function main() {
 main().catch((error) => {
   fail("Unhandled smoke test error", { message: error.message });
 });
-
