@@ -256,7 +256,11 @@ export default function StaffDashboard({ user, onLogout }) {
   const urgentReviewPatients = useMemo(
     () =>
       patients
-        .filter((patient) => patient.urgentReviewRequested && patient.rawStatus === "waiting")
+        .filter(
+          (patient) =>
+            patient.rawStatus === "waiting"
+            && (patient.urgentReviewRequested || patient.priority === "high" || patient.priority === "critical")
+        )
         .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.token - b.token),
     [patients]
   );
