@@ -190,15 +190,16 @@ async function ensureSchema() {
       ('doctor01', $3, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
       ('admin01', $4, 'admin', 'System Admin', 'Platform Admin', TRUE)
     ON CONFLICT (user_id) DO UPDATE
-    SET role = EXCLUDED.role,
+    SET password_hash = EXCLUDED.password_hash,
+        role = EXCLUDED.role,
         name = EXCLUDED.name,
         designation = EXCLUDED.designation,
         active = TRUE,
         updated_at = CURRENT_TIMESTAMP
   `, [
-    hashStaffPassword("recept123"),
-    hashStaffPassword("nurse123"),
-    hashStaffPassword("doc123"),
+    hashStaffPassword("sqrecp123"),
+    hashStaffPassword("sqnurse123"),
+    hashStaffPassword("sqdoc123"),
     hashStaffPassword("admin123"),
   ]);
 

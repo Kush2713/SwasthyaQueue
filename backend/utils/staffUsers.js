@@ -1,21 +1,21 @@
 const STAFF_USERS = {
   receptionist01: {
     userId: "receptionist01",
-    password: "recept123",
+    password: "sqrecp123",
     role: "receptionist",
     name: "Anita Reddy",
     designation: "Receptionist",
   },
   nurse01: {
     userId: "nurse01",
-    password: "nurse123",
+    password: "sqnurse123",
     role: "nurse",
     name: "Sujatha Rao",
     designation: "Nurse | Triage",
   },
   doctor01: {
     userId: "doctor01",
-    password: "doc123",
+    password: "sqdoc123",
     role: "doctor",
     name: "Dr. S. Mehta",
     designation: "Doctor | General Medicine",
