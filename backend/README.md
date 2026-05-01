@@ -183,6 +183,36 @@ Hosted setups can use:
 - `ML_SERVICE_URL`
 - `OTP_PREVIEW_ENABLED=false`
 
+## Demo Staff Credentials (Seeded By ensureSchema)
+
+These users are auto-seeded in current `final` branch bootstrap.
+
+Shared passwords:
+- Receptionist: `sqrecp123`
+- All nurses: `sqnurse123`
+- All doctors: `sqdoc123`
+- Admin: `admin123`
+
+Reception:
+- `receptionist01` -> Anita Reddy
+
+Nurses:
+- `nurse01` -> Sujatha Rao (General Medicine)
+- `nurse_cardio01` -> Lakshmi Iyer (Cardiology)
+- `nurse_ortho01` -> Ravi Kumar (Orthopedics)
+- `nurse_pedia01` -> Meera Nair (Pediatrics)
+- `nurse_emg01` -> Arjun Verma (Emergency)
+
+Doctors:
+- `doctor01` -> Dr. S. Mehta (General Medicine)
+- `doctor_cardio01` -> Dr. Priya Menon (Cardiology)
+- `doctor_ortho01` -> Dr. Vikram Singh (Orthopedics)
+- `doctor_pedia01` -> Dr. Ananya Rao (Pediatrics)
+- `doctor_emg01` -> Dr. Farhan Ali (Emergency)
+
+Admin:
+- `admin01` -> System Admin
+
 ## API Groups
 
 ### Utility

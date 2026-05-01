@@ -24,6 +24,18 @@ Current hardening highlights (already implemented):
 - stable queue workflow guards (clear 409 errors for wrong-state actions)
 - same-day preferred-slot booking support (future slot + OPD window rules)
 
+Current final-branch role setup:
+
+- 1 receptionist account
+- 5 nurse accounts (department-specific)
+- 5 doctor accounts (department-specific)
+- DB-backed staff-to-department assignments and scoped dashboards
+
+Credential source:
+
+- See [Root README demo credential section](../README.md)
+- See [Backend README seeded credentials](../backend/README.md)
+
 ### [WORKFLOWS.md](WORKFLOWS.md)
 
 Use this when you want the operational flow.
