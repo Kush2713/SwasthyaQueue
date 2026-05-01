@@ -142,6 +142,7 @@ Data state commands:
 npm.cmd run empty-run
 npm.cmd run complete-run
 npm.cmd run test:e2e:smoke
+npm.cmd run test:e2e:full
 ```
 
 Default local URL:

@@ -56,6 +56,12 @@ cd backend
 npm.cmd run test:e2e:smoke
 ```
 
+6. Full department regression test (empty DB -> all 5 departments)
+```powershell
+cd backend
+npm.cmd run test:e2e:full
+```
+
 Primary URLs:
 - Frontend: `http://localhost:3001`
 - Backend: `http://localhost:5000`
@@ -98,6 +104,7 @@ From `backend/`:
 - `npm.cmd run empty-run` -> clear operational data
 - `npm.cmd run complete-run` -> load full demo+rush dataset
 - `npm.cmd run test:e2e:smoke` -> run end-to-end API smoke flow
+- `npm.cmd run test:e2e:full` -> reset DB and run full end-to-end checks for all 5 departments
 
 ## Why This Project Exists
 

@@ -23,24 +23,6 @@ const signupDefaults = {
   chronicConditions: "",
 };
 
-const staffDirectory = {
-  reception: [{ name: "Anita Reddy", userId: "receptionist01" }],
-  nurses: [
-    { name: "Sujatha Rao", userId: "nurse01", dept: "General Medicine" },
-    { name: "Lakshmi Iyer", userId: "nurse_cardio01", dept: "Cardiology" },
-    { name: "Ravi Kumar", userId: "nurse_ortho01", dept: "Orthopedics" },
-    { name: "Meera Nair", userId: "nurse_pedia01", dept: "Pediatrics" },
-    { name: "Arjun Verma", userId: "nurse_emg01", dept: "Emergency" },
-  ],
-  doctors: [
-    { name: "Dr. S. Mehta", userId: "doctor01", dept: "General Medicine" },
-    { name: "Dr. Priya Menon", userId: "doctor_cardio01", dept: "Cardiology" },
-    { name: "Dr. Vikram Singh", userId: "doctor_ortho01", dept: "Orthopedics" },
-    { name: "Dr. Ananya Rao", userId: "doctor_pedia01", dept: "Pediatrics" },
-    { name: "Dr. Farhan Ali", userId: "doctor_emg01", dept: "Emergency" },
-  ],
-};
-
 const BLOOD_GROUP_OPTIONS = [
   "",
   "A+",
@@ -415,31 +397,6 @@ export default function LoginPage({ onLogin }) {
                     {loading ? "Signing In..." : "Sign In"}
                   </button>
 
-                  <div className="rounded-lg border border-slate-200 bg-[#F8FAFC] px-3.5 py-3 text-xs text-slate-600">
-                    <p>Passwords are intentionally hidden. Use credentials shared by your admin/team.</p>
-                    <div className="mt-2 grid gap-2 text-[11px]">
-                      <div>
-                        <strong className="text-slate-700">Reception</strong>
-                        <div className="mt-1 text-slate-600">{staffDirectory.reception[0].name} ({staffDirectory.reception[0].userId})</div>
-                      </div>
-                      <div>
-                        <strong className="text-slate-700">Nurses</strong>
-                        <div className="mt-1 space-y-0.5 text-slate-600">
-                          {staffDirectory.nurses.map((person) => (
-                            <div key={person.userId}>{person.name} - {person.dept} ({person.userId})</div>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <strong className="text-slate-700">Doctors</strong>
-                        <div className="mt-1 space-y-0.5 text-slate-600">
-                          {staffDirectory.doctors.map((person) => (
-                            <div key={person.userId}>{person.name} - {person.dept} ({person.userId})</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </form>
               )}
             </div>
