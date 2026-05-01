@@ -7,6 +7,7 @@ const patientRoutes = require("./routes/patientRoutes");
 const authRoutes = require("./routes/authRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const { ensureSchema } = require("./bootstrap/ensureSchema");
+const doctorRoutes = require("./routes/doctorRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/doctors", doctorRoutes);
 
 // Test Route
 app.get("/", (req, res) => {
