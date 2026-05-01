@@ -135,7 +135,6 @@ export default function StaffDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState(isNurse ? "triage" : isDoctor ? "consult" : "overview");
   const [clock, setClock] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
-  const [staffDepartmentFilter, setStaffDepartmentFilter] = useState("All");
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupSearched, setLookupSearched] = useState(false);
@@ -268,24 +267,15 @@ export default function StaffDashboard({ user, onLogout }) {
   }, [screenState, loadDashboardData]);
 
   const kpis = useMemo(() => {
-    const scopedPatients = (isNurse || isDoctor) && staffDepartmentFilter !== "All"
-      ? patients.filter((patient) => patient.department === staffDepartmentFilter)
-      : patients;
-    const waiting = scopedPatients.filter((patient) => patient.rawStatus === "waiting").length;
-    const inConsult = scopedPatients.filter((patient) => patient.rawStatus === "in-progress").length;
-    const completed = scopedPatients.filter((patient) => patient.rawStatus === "completed").length;
-    const criticalWait = scopedPatients.filter((patient) => patient.rawStatus === "waiting" && patient.priority === "critical").length;
-    const avgWait = waiting ? Math.round(scopedPatients.filter((patient) => patient.rawStatus === "waiting").reduce((sum, patient) => sum + patient.waitMins, 0) / waiting) : 0;
-    return { totalToday: scopedPatients.length, waiting, inConsult, completed, criticalWait, avgWait };
-  }, [patients, isNurse, isDoctor, staffDepartmentFilter]);
+    const waiting = patients.filter((patient) => patient.rawStatus === "waiting").length;
+    const inConsult = patients.filter((patient) => patient.rawStatus === "in-progress").length;
+    const completed = patients.filter((patient) => patient.rawStatus === "completed").length;
+    const criticalWait = patients.filter((patient) => patient.rawStatus === "waiting" && patient.priority === "critical").length;
+    const avgWait = waiting ? Math.round(patients.filter((patient) => patient.rawStatus === "waiting").reduce((sum, patient) => sum + patient.waitMins, 0) / waiting) : 0;
+    return { totalToday: patients.length, waiting, inConsult, completed, criticalWait, avgWait };
+  }, [patients]);
 
-  const staffScopedPatients = useMemo(
-    () =>
-      (isNurse || isDoctor) && staffDepartmentFilter !== "All"
-        ? patients.filter((patient) => patient.department === staffDepartmentFilter)
-        : patients,
-    [patients, isNurse, isDoctor, staffDepartmentFilter]
-  );
+  const staffScopedPatients = useMemo(() => patients, [patients]);
 
   const alertsList = useMemo(
     () =>
@@ -431,14 +421,6 @@ export default function StaffDashboard({ user, onLogout }) {
     };
   }, [isDoctor, selectedDoctorQueueId, doctorCaseMap]);
 
-  useEffect(() => {
-    if (!(isNurse || isDoctor)) return;
-    if (!departments.length) return;
-    const names = departments.map((department) => department.name);
-    if (staffDepartmentFilter !== "All" && !names.includes(staffDepartmentFilter)) {
-      setStaffDepartmentFilter(names[0] || "All");
-    }
-  }, [isNurse, isDoctor, departments, staffDepartmentFilter]);
 
   const pushToast = (message) => setToast(message);
 
@@ -720,24 +702,6 @@ export default function StaffDashboard({ user, onLogout }) {
         </section>
 
         <TabsBar activeTab={activeTab} onChange={setActiveTab} userRole={user?.role} />
-
-        {(isNurse || isDoctor) ? (
-          <section style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-            <label style={{ display: "grid", gap: 4, minWidth: 220 }}>
-              <span style={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>Department View</span>
-              <select
-                value={staffDepartmentFilter}
-                onChange={(event) => setStaffDepartmentFilter(event.target.value)}
-                style={{ border: "1px solid #CBD5E1", borderRadius: 8, background: "#fff", padding: "8px 10px", fontSize: 13, fontWeight: 700, color: "#334155" }}
-              >
-                <option value="All">All Assigned</option>
-                {departments.map((department) => (
-                  <option key={department.department_id} value={department.name}>{department.name}</option>
-                ))}
-              </select>
-            </label>
-          </section>
-        ) : null}
 
         {activeTab === "overview" && !isNurse ? (
           <section style={{ marginTop: 10 }}>
