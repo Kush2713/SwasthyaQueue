@@ -27,17 +27,17 @@ const staffDirectory = {
   reception: [{ name: "Anita Reddy", userId: "receptionist01" }],
   nurses: [
     { name: "Sujatha Rao", userId: "nurse01", dept: "General Medicine" },
-    { name: "Nurse Cardiology", userId: "nurse_cardio01", dept: "Cardiology" },
-    { name: "Nurse Orthopedics", userId: "nurse_ortho01", dept: "Orthopedics" },
-    { name: "Nurse Pediatrics", userId: "nurse_pedia01", dept: "Pediatrics" },
-    { name: "Nurse Emergency", userId: "nurse_emg01", dept: "Emergency" },
+    { name: "Lakshmi Iyer", userId: "nurse_cardio01", dept: "Cardiology" },
+    { name: "Ravi Kumar", userId: "nurse_ortho01", dept: "Orthopedics" },
+    { name: "Meera Nair", userId: "nurse_pedia01", dept: "Pediatrics" },
+    { name: "Arjun Verma", userId: "nurse_emg01", dept: "Emergency" },
   ],
   doctors: [
     { name: "Dr. S. Mehta", userId: "doctor01", dept: "General Medicine" },
-    { name: "Dr. Cardiology", userId: "doctor_cardio01", dept: "Cardiology" },
-    { name: "Dr. Orthopedics", userId: "doctor_ortho01", dept: "Orthopedics" },
-    { name: "Dr. Pediatrics", userId: "doctor_pedia01", dept: "Pediatrics" },
-    { name: "Doctor Emergency", userId: "doctor_emg01", dept: "Emergency" },
+    { name: "Dr. Priya Menon", userId: "doctor_cardio01", dept: "Cardiology" },
+    { name: "Dr. Vikram Singh", userId: "doctor_ortho01", dept: "Orthopedics" },
+    { name: "Dr. Ananya Rao", userId: "doctor_pedia01", dept: "Pediatrics" },
+    { name: "Dr. Farhan Ali", userId: "doctor_emg01", dept: "Emergency" },
   ],
 };
 

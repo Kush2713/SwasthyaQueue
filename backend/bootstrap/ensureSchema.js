@@ -187,15 +187,15 @@ async function ensureSchema() {
     VALUES
       ('receptionist01', $1, 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
       ('nurse01', $2, 'nurse', 'Sujatha Rao', 'Nurse | General Medicine', TRUE),
-      ('nurse_cardio01', $3, 'nurse', 'Nurse Cardiology', 'Nurse | Cardiology', TRUE),
-      ('nurse_ortho01', $4, 'nurse', 'Nurse Orthopedics', 'Nurse | Orthopedics', TRUE),
-      ('nurse_pedia01', $5, 'nurse', 'Nurse Pediatrics', 'Nurse | Pediatrics', TRUE),
-      ('nurse_emg01', $6, 'nurse', 'Nurse Emergency', 'Nurse | Emergency', TRUE),
+      ('nurse_cardio01', $3, 'nurse', 'Lakshmi Iyer', 'Nurse | Cardiology', TRUE),
+      ('nurse_ortho01', $4, 'nurse', 'Ravi Kumar', 'Nurse | Orthopedics', TRUE),
+      ('nurse_pedia01', $5, 'nurse', 'Meera Nair', 'Nurse | Pediatrics', TRUE),
+      ('nurse_emg01', $6, 'nurse', 'Arjun Verma', 'Nurse | Emergency', TRUE),
       ('doctor01', $7, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
-      ('doctor_cardio01', $8, 'doctor', 'Dr. Cardiology', 'Doctor | Cardiology', TRUE),
-      ('doctor_ortho01', $9, 'doctor', 'Dr. Orthopedics', 'Doctor | Orthopedics', TRUE),
-      ('doctor_pedia01', $10, 'doctor', 'Dr. Pediatrics', 'Doctor | Pediatrics', TRUE),
-      ('doctor_emg01', $11, 'doctor', 'Doctor Emergency', 'Doctor | Emergency', TRUE),
+      ('doctor_cardio01', $8, 'doctor', 'Dr. Priya Menon', 'Doctor | Cardiology', TRUE),
+      ('doctor_ortho01', $9, 'doctor', 'Dr. Vikram Singh', 'Doctor | Orthopedics', TRUE),
+      ('doctor_pedia01', $10, 'doctor', 'Dr. Ananya Rao', 'Doctor | Pediatrics', TRUE),
+      ('doctor_emg01', $11, 'doctor', 'Dr. Farhan Ali', 'Doctor | Emergency', TRUE),
       ('admin01', $12, 'admin', 'System Admin', 'Platform Admin', TRUE)
     ON CONFLICT (user_id) DO UPDATE
     SET password_hash = EXCLUDED.password_hash,
