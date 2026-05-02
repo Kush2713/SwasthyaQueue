@@ -110,7 +110,8 @@ function getAssignedDepartmentIdsFromAuth(auth) {
 
 function hasDepartmentAccess(auth, departmentId) {
   const role = auth?.role;
-  if (!["receptionist", "nurse", "doctor"].includes(role)) return true;
+  if (role === "receptionist") return true;
+  if (!["nurse", "doctor"].includes(role)) return true;
 
   const ids = getAssignedDepartmentIdsFromAuth(auth);
   if (!ids.length) return true; // compatibility fallback until full enforcement rollout
