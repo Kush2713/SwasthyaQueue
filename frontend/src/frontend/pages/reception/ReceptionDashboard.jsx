@@ -641,66 +641,71 @@ export default function ReceptionDashboard({ user, onLogout }) {
               text={`Created patient ID ${assistedState.success.patient.patient_id} with assisted reference ${assistedState.success.account.assistedReference}. If the patient has no phone, use this reference at the desk.`}
             />
           ) : null}
-          <form onSubmit={handleAssistedCreate}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10 }}>
-              <Field label="Full Name *">
-                <input value={assistedForm.name} onChange={(event) => setAssistedField("name", event.target.value)} style={inputStyle} />
-              </Field>
-              <Field label="Age *">
-                <input value={assistedForm.age} onChange={(event) => setAssistedField("age", event.target.value.replace(/\D/g, "").slice(0, 3))} style={inputStyle} />
-              </Field>
-              <Field label="Gender *">
-                <select value={assistedForm.gender} onChange={(event) => setAssistedField("gender", event.target.value)} style={inputStyle}>
-                  <option value="">Select</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </Field>
-              <Field label="Mobile (optional)">
-                <input value={assistedForm.mobile} onChange={(event) => setAssistedField("mobile", normalizeMobile(event.target.value))} placeholder="If patient has a number" style={inputStyle} />
-              </Field>
-              <Field label="Email (optional)">
-                <input value={assistedForm.email} onChange={(event) => setAssistedField("email", event.target.value)} style={inputStyle} />
-              </Field>
-              <Field label="Emergency Contact">
-                <input value={assistedForm.emergencyContact} onChange={(event) => setAssistedField("emergencyContact", normalizeMobile(event.target.value))} style={inputStyle} />
-              </Field>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Address">
-                  <textarea value={assistedForm.address} onChange={(event) => setAssistedField("address", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+          {!assistedState.success ? (
+            <form onSubmit={handleAssistedCreate}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10 }}>
+                <Field label="Full Name *">
+                  <input value={assistedForm.name} onChange={(event) => setAssistedField("name", event.target.value)} style={inputStyle} />
                 </Field>
+                <Field label="Age *">
+                  <input value={assistedForm.age} onChange={(event) => setAssistedField("age", event.target.value.replace(/\D/g, "").slice(0, 3))} style={inputStyle} />
+                </Field>
+                <Field label="Gender *">
+                  <select value={assistedForm.gender} onChange={(event) => setAssistedField("gender", event.target.value)} style={inputStyle}>
+                    <option value="">Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </Field>
+                <Field label="Mobile (optional)">
+                  <input value={assistedForm.mobile} onChange={(event) => setAssistedField("mobile", normalizeMobile(event.target.value))} placeholder="If patient has a number" style={inputStyle} />
+                </Field>
+                <Field label="Email (optional)">
+                  <input value={assistedForm.email} onChange={(event) => setAssistedField("email", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Emergency Contact">
+                  <input value={assistedForm.emergencyContact} onChange={(event) => setAssistedField("emergencyContact", normalizeMobile(event.target.value))} style={inputStyle} />
+                </Field>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Address">
+                    <textarea value={assistedForm.address} onChange={(event) => setAssistedField("address", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+                  </Field>
+                </div>
               </div>
-            </div>
-            <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button type="submit" disabled={assistedState.loading} style={{ ...btnPrimary, opacity: assistedState.loading ? 0.7 : 1, cursor: assistedState.loading ? "not-allowed" : "pointer" }}>
-                {assistedState.loading ? "Creating..." : "Create Assisted Account"}
-              </button>
+              <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button type="submit" disabled={assistedState.loading} style={{ ...btnPrimary, opacity: assistedState.loading ? 0.7 : 1, cursor: assistedState.loading ? "not-allowed" : "pointer" }}>
+                  {assistedState.loading ? "Creating..." : "Create Assisted Account"}
+                </button>
               </div>
             </form>
-            {assistedState.success ? (
-              <form onSubmit={handleCreateCaseForAssisted} style={{ marginTop: 14, borderTop: "1px solid #E2E8F0", paddingTop: 12 }}>
-                <SectionTitle title="Create Case For This Patient" subtitle="Capture visit details and add patient to live queue now" />
-                {assistedCaseState.error ? <Notice tone="warn" text={assistedCaseState.error} /> : null}
-                {assistedCaseState.success ? <Notice tone="info" text={assistedCaseState.success} /> : null}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10 }}>
-                  <Field label="Department *">
-                    <select value={assistedCaseForm.departmentId} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, departmentId: event.target.value }))} style={inputStyle}>
-                      <option value="">Select Department</option>
-                      {departments.map((department) => <option key={`assisted-case-${department.department_id}`} value={department.department_id}>{department.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Symptoms / Quick Note">
-                    <input value={assistedCaseForm.symptoms} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, symptoms: event.target.value }))} placeholder="Short symptom note for triage" style={inputStyle} />
-                  </Field>
-                </div>
-                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <button type="submit" disabled={assistedCaseState.loading} style={{ ...btnPrimary, opacity: assistedCaseState.loading ? 0.7 : 1, cursor: assistedCaseState.loading ? "not-allowed" : "pointer" }}>
-                    {assistedCaseState.loading ? "Adding..." : "Create Case & Add To Queue"}
-                  </button>
-                </div>
-              </form>
-            ) : null}
+          ) : (
+            <form onSubmit={handleCreateCaseForAssisted} style={{ marginTop: 8 }}>
+              <SectionTitle title="Add Case To Queue" subtitle="Patient created. Add current visit details and save to queue." />
+              {assistedCaseState.error ? <Notice tone="warn" text={assistedCaseState.error} /> : null}
+              {assistedCaseState.success ? <Notice tone="info" text={assistedCaseState.success} /> : null}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10, marginBottom: 10 }}>
+                <InfoBox label="Patient Name" value={assistedState.success?.patient?.name || "-"} />
+                <InfoBox label="Phone" value={formatIndianMobile(assistedState.success?.patient?.phone || "")} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10 }}>
+                <Field label="Department *">
+                  <select value={assistedCaseForm.departmentId} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, departmentId: event.target.value }))} style={inputStyle}>
+                    <option value="">Select Department</option>
+                    {departments.map((department) => <option key={`assisted-case-${department.department_id}`} value={department.department_id}>{department.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Symptoms / Quick Note">
+                  <input value={assistedCaseForm.symptoms} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, symptoms: event.target.value }))} placeholder="Short symptom note for triage" style={inputStyle} />
+                </Field>
+              </div>
+              <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                <button type="submit" disabled={assistedCaseState.loading} style={{ ...btnPrimary, opacity: assistedCaseState.loading ? 0.7 : 1, cursor: assistedCaseState.loading ? "not-allowed" : "pointer" }}>
+                  {assistedCaseState.loading ? "Saving..." : "Save & Add To Queue"}
+                </button>
+              </div>
+            </form>
+          )}
         </OverlayModal>
       ) : null}
 
