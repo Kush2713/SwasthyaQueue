@@ -2,6 +2,7 @@ const pool = require("../db");
 const { logWorkflowEvent } = require("../utils/audit");
 const { getActorFromRequest, getAssignedDepartmentIdsFromAuth } = require("../middleware/authMiddleware");
 const { formatTokenLabel } = require("../utils/tokenLabel");
+const { normalizeMobile, isValidIndianMobile, normalizeEmail } = require("../utils/auth");
 const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
 
 // Register Patient
@@ -52,6 +53,21 @@ const updatePatientProfile = async (req, res) => {
       allergies,
       chronicConditions,
     } = req.body;
+    const normalizedMobile = normalizeMobile(mobile);
+    const normalizedEmergency = emergencyContact ? normalizeMobile(emergencyContact) : null;
+    const normalizedEmail = email ? normalizeEmail(email) : null;
+
+    if (!name?.trim()) return res.status(400).json({ error: "Full name is required." });
+    if (!Number.isFinite(Number(age)) || Number(age) < 0 || Number(age) > 120) {
+      return res.status(400).json({ error: "Please enter a valid age." });
+    }
+    if (!gender?.trim()) return res.status(400).json({ error: "Gender is required." });
+    if (!isValidIndianMobile(normalizedMobile)) {
+      return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
+    }
+    if (Number(age) < 18 && !isValidIndianMobile(normalizedEmergency)) {
+      return res.status(400).json({ error: "For patients below 18, a valid guardian mobile number is required." });
+    }
 
     const result = await pool.query(
       `
@@ -74,10 +90,10 @@ const updatePatientProfile = async (req, res) => {
         name?.trim(),
         Number(age),
         gender,
-        mobile,
-        email || null,
+        normalizedMobile,
+        normalizedEmail || null,
         address || null,
-        emergencyContact || null,
+        normalizedEmergency || null,
         bloodGroup || null,
         allergies || null,
         chronicConditions || null,
@@ -92,7 +108,7 @@ const updatePatientProfile = async (req, res) => {
             updated_at = CURRENT_TIMESTAMP
         WHERE patient_id = $1
       `,
-      [patientId, email || null, mobile]
+      [patientId, normalizedEmail || null, normalizedMobile]
     );
 
     await logWorkflowEvent(pool, {
@@ -102,8 +118,8 @@ const updatePatientProfile = async (req, res) => {
       entityId: patientId,
       patientId,
       details: {
-        mobile: mobile || null,
-        email: email || null,
+        mobile: normalizedMobile || null,
+        email: normalizedEmail || null,
       },
     });
 
@@ -113,6 +129,9 @@ const updatePatientProfile = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    if (err?.code === "23505") {
+      return res.status(409).json({ error: "This mobile or email is already linked to another patient account." });
+    }
     res.status(500).json({ error: "Unable to update patient profile" });
   }
 };
@@ -133,9 +152,23 @@ const updatePatientProfileById = async (req, res) => {
       allergies,
       chronicConditions,
     } = req.body;
+    const normalizedMobile = mobile ? normalizeMobile(mobile) : null;
+    const normalizedEmergency = emergencyContact ? normalizeMobile(emergencyContact) : null;
+    const normalizedEmail = email ? normalizeEmail(email) : null;
 
     if (!Number.isFinite(patientId)) {
       return res.status(400).json({ error: "Invalid patient id." });
+    }
+    if (!name?.trim()) return res.status(400).json({ error: "Full name is required." });
+    if (!Number.isFinite(Number(age)) || Number(age) < 0 || Number(age) > 120) {
+      return res.status(400).json({ error: "Please enter a valid age." });
+    }
+    if (!gender?.trim()) return res.status(400).json({ error: "Gender is required." });
+    if (!isValidIndianMobile(normalizedMobile)) {
+      return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
+    }
+    if (Number(age) < 18 && !isValidIndianMobile(normalizedEmergency)) {
+      return res.status(400).json({ error: "For patients below 18, a valid guardian mobile number is required." });
     }
 
     const result = await pool.query(
@@ -157,12 +190,12 @@ const updatePatientProfileById = async (req, res) => {
       [
         patientId,
         name?.trim(),
-        Number(age) || 0,
+        Number(age),
         gender || null,
-        mobile || null,
-        email || null,
+        normalizedMobile || null,
+        normalizedEmail || null,
         address || null,
-        emergencyContact || null,
+        normalizedEmergency || null,
         bloodGroup || null,
         allergies || null,
         chronicConditions || null,
@@ -181,7 +214,7 @@ const updatePatientProfileById = async (req, res) => {
             updated_at = CURRENT_TIMESTAMP
         WHERE patient_id = $1
       `,
-      [patientId, email || null, mobile || null]
+      [patientId, normalizedEmail || null, normalizedMobile || null]
     );
 
     await logWorkflowEvent(pool, {
@@ -191,8 +224,8 @@ const updatePatientProfileById = async (req, res) => {
       entityId: patientId,
       patientId,
       details: {
-        mobile: mobile || null,
-        email: email || null,
+        mobile: normalizedMobile || null,
+        email: normalizedEmail || null,
       },
     });
 
@@ -202,6 +235,9 @@ const updatePatientProfileById = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    if (err?.code === "23505") {
+      return res.status(409).json({ error: "This mobile or email is already linked to another patient account." });
+    }
     res.status(500).json({ error: "Unable to update patient profile." });
   }
 };

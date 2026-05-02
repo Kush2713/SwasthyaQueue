@@ -16,6 +16,7 @@ const signupDefaults = {
   age: "",
   gender: "",
   mobile: "",
+  guardianContact: "",
   email: "",
   address: "",
   bloodGroup: "",
@@ -41,6 +42,10 @@ function normalizeMobile(value = "") {
   return digits.slice(0, 10);
 }
 
+function isValidIndianMobile(value = "") {
+  return /^[6-9]\d{9}$/.test(normalizeMobile(value));
+}
+
 export default function LoginPage({ onLogin }) {
   const [activeRole, setActiveRole] = useState("patient");
   const [patientMode, setPatientMode] = useState("login");
@@ -55,6 +60,7 @@ export default function LoginPage({ onLogin }) {
   const [staffUserId, setStaffUserId] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const patientTitle = useMemo(
     () =>
@@ -80,6 +86,7 @@ export default function LoginPage({ onLogin }) {
     setDevOtp("");
     setNotice("");
     setError("");
+    setFieldErrors({});
   };
 
   const handlePatientLoginRequest = async (event) => {
@@ -87,9 +94,16 @@ export default function LoginPage({ onLogin }) {
     setLoading(true);
     setError("");
     setNotice("");
+    setFieldErrors({});
+    const cleanIdentifier = String(identifier || "").trim();
+    if (!cleanIdentifier) {
+      setError("Email or mobile is required.");
+      setLoading(false);
+      return;
+    }
 
     try {
-      const response = await requestPatientOtp({ identifier });
+      const response = await requestPatientOtp({ identifier: cleanIdentifier });
       setPatientStep("verify");
       setDevOtp(response.devOtp || "");
       setNotice(`OTP generated for ${response.channel}. Enter it below to continue.`);
@@ -105,12 +119,29 @@ export default function LoginPage({ onLogin }) {
     setLoading(true);
     setError("");
     setNotice("");
+    setFieldErrors({});
+    const nextErrors = {};
+    if (!signupForm.name.trim()) nextErrors.name = "Full name is required.";
+    if (!Number.isFinite(Number(signupForm.age)) || Number(signupForm.age) < 0 || Number(signupForm.age) > 120) {
+      nextErrors.age = "Enter a valid age.";
+    }
+    if (!signupForm.gender) nextErrors.gender = "Gender is required.";
+    if (!isValidIndianMobile(signupForm.mobile)) nextErrors.mobile = "Enter a valid Indian mobile number.";
+    if (Number(signupForm.age) < 18 && !isValidIndianMobile(signupForm.guardianContact || "")) {
+      nextErrors.guardianContact = "Guardian mobile is required for below 18.";
+    }
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors);
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await signupPatientAccount({
         ...signupForm,
         age: Number(signupForm.age),
         mobile: normalizeMobile(signupForm.mobile),
+        guardianContact: normalizeMobile(signupForm.guardianContact || ""),
       });
 
       const resolvedIdentifier = signupForm.email.trim() || normalizeMobile(signupForm.mobile);
@@ -129,11 +160,17 @@ export default function LoginPage({ onLogin }) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    const cleanOtp = String(otp || "").replace(/\s+/g, "").trim();
+    if (!cleanOtp) {
+      setError("OTP is required.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await verifyPatientOtp({
-        identifier,
-        otp,
+        identifier: String(identifier || "").trim(),
+        otp: cleanOtp,
       });
 
       if (typeof onLogin === "function") {
@@ -280,7 +317,7 @@ export default function LoginPage({ onLogin }) {
                         <input
                           className={inputStyle}
                           value={identifier}
-                          onChange={(event) => setIdentifier(event.target.value)}
+                          onChange={(event) => setIdentifier(event.target.value.replace(/\s+/g, " ").trimStart())}
                           placeholder="Enter registered email or mobile"
                           autoComplete="username"
                         />
@@ -300,9 +337,11 @@ export default function LoginPage({ onLogin }) {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Full Name *">
                           <input className={inputStyle} value={signupForm.name} onChange={(event) => setSignupField("name", event.target.value)} />
+                          {fieldErrors.name ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.name}</div> : null}
                         </Field>
                         <Field label="Age *">
                           <input className={inputStyle} value={signupForm.age} onChange={(event) => setSignupField("age", event.target.value.replace(/\D/g, "").slice(0, 3))} />
+                          {fieldErrors.age ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.age}</div> : null}
                         </Field>
                         <Field label="Gender *">
                           <select className={inputStyle} value={signupForm.gender} onChange={(event) => setSignupField("gender", event.target.value)}>
@@ -311,9 +350,15 @@ export default function LoginPage({ onLogin }) {
                             <option value="Female">Female</option>
                             <option value="Other">Other</option>
                           </select>
+                          {fieldErrors.gender ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.gender}</div> : null}
                         </Field>
                         <Field label="Mobile *">
                           <input className={inputStyle} value={signupForm.mobile} onChange={(event) => setSignupField("mobile", normalizeMobile(event.target.value))} placeholder="9876543210" />
+                          {fieldErrors.mobile ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.mobile}</div> : null}
+                        </Field>
+                        <Field label="Guardian Mobile (if below 18)">
+                          <input className={inputStyle} value={signupForm.guardianContact || ""} onChange={(event) => setSignupField("guardianContact", normalizeMobile(event.target.value))} placeholder="Guardian number for minor patients" />
+                          {fieldErrors.guardianContact ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.guardianContact}</div> : null}
                         </Field>
                         <Field label="Email">
                           <input className={inputStyle} value={signupForm.email} onChange={(event) => setSignupField("email", event.target.value)} placeholder="you@example.com" />

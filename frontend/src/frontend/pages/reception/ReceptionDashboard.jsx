@@ -16,8 +16,16 @@ const DEPARTMENT_COLORS = {
   Cardiology: { accent: "#DC2626", soft: "#FEE2E2" },
   Orthopedics: { accent: "#EA580C", soft: "#FFEDD5" },
   Pediatrics: { accent: "#16A34A", soft: "#DCFCE7" },
-  Emergency: { accent: "#7C3AED", soft: "#EDE9FE" },
+  Emergency: { accent: "#B91C1C", soft: "#FEE2E2" },
 };
+
+function isEmergencyDepartment(name = "") {
+  return String(name).toLowerCase().includes("emerg");
+}
+
+function EmergencyPill() {
+  return <span style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 999, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>Emergency</span>;
+}
 
 function clockText() {
   const date = new Date();
@@ -745,22 +753,26 @@ function DepartmentCard({ department, active, onSelect, onCallNext }) {
 }
 
 function QueueRow({ row, urgentForm, setUrgentForm, onUrgentReview, onCallNext, onOpenCase }) {
+  const emergency = isEmergencyDepartment(row.department);
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "80px 1.5fr 1.1fr 1fr 1fr 1fr 1.4fr", padding: "10px 12px", fontSize: 12, color: "#334155", borderBottom: "1px solid #E2E8F0", alignItems: "center" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "80px 1.5fr 1.1fr 1fr 1fr 1fr 1.4fr", padding: "10px 12px", fontSize: 12, color: "#334155", borderBottom: "1px solid #E2E8F0", alignItems: "center", borderLeft: emergency ? "4px solid #B91C1C" : "4px solid transparent", background: emergency ? "#FFF7F7" : "#fff" }}>
       <div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{row.token}</div>
       <div>
         <div style={{ fontWeight: 700 }}>{row.name}</div>
         <div style={{ fontSize: 11, color: "#64748B" }}>ID {row.patientId}</div>
       </div>
       <div>{formatIndianMobile(row.mobile)}</div>
-      <div>{row.department}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ color: emergency ? "#B91C1C" : "#334155", fontWeight: emergency ? 700 : 500 }}>{row.department}</span>
+        {emergency ? <EmergencyPill /> : null}
+      </div>
       <div>{row.status}</div>
         <div>{row.peopleAhead}</div>
         <div>
           <div>{row.waitMins} min</div>
           <div style={{ marginTop: 6, display: "grid", gap: 6, justifyItems: "start" }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {row.rawStatus === "waiting" ? (
+              {row.rawStatus === "waiting" && !row.urgentReviewRequested ? (
                 <button type="button" onClick={() => onCallNext(row.departmentId)} style={{ ...btnPrimary, padding: "6px 10px", fontSize: 12 }}>
                   Call Next
                 </button>
@@ -770,7 +782,7 @@ function QueueRow({ row, urgentForm, setUrgentForm, onUrgentReview, onCallNext, 
               </button>
             </div>
             {row.urgentReviewRequested ? (
-              <div style={{ color: "#B45309", fontWeight: 700 }}>Urgent review flagged</div>
+              <div style={{ color: "#B45309", fontWeight: 700 }}>Urgent review flagged (waiting for nurse decision)</div>
             ) : (
               <div>
               {urgentForm.queueId === row.queueId ? (

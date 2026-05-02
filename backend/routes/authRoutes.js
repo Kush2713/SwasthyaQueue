@@ -18,7 +18,7 @@ const { requireAuth, requirePatientAuth, requireRoles } = require("../middleware
 
 router.post("/patient/signup", signupPatient);
 router.post("/staff/login", loginStaff);
-router.post("/staff/patient-account", requireRoles(["receptionist"]), createAssistedPatientAccount);
+router.post("/staff/patient-account", requireRoles(["receptionist", "admin"]), createAssistedPatientAccount);
 router.post("/patient/request-otp", requestPatientOtp);
 router.post("/patient/verify-otp", verifyPatientOtp);
 router.get("/me", requireAuth, getCurrentSession);

@@ -5,6 +5,7 @@ const {
   getOtpExpirySql,
   hashOtp,
   issueAuthToken,
+  isValidIndianMobile,
   normalizeEmail,
   normalizeIdentifier,
   normalizeMobile,
@@ -38,7 +39,10 @@ function validateSignup(body) {
     return "Please enter a valid age.";
   }
   if (!body.gender?.trim()) return "Gender is required.";
-  if (!normalizeMobile(body.mobile)) return "A valid mobile number is required.";
+  if (!isValidIndianMobile(body.mobile)) return "Enter a valid Indian mobile number (starts with 6-9).";
+  if (Number(body.age) < 18 && !isValidIndianMobile(body.guardianContact)) {
+    return "For patients below 18, a valid guardian mobile number is required.";
+  }
   return "";
 }
 
@@ -48,6 +52,12 @@ function validateAssistedSignup(body) {
     return "Please enter a valid age.";
   }
   if (!body.gender?.trim()) return "Gender is required.";
+  if (body.mobile && !isValidIndianMobile(body.mobile)) {
+    return "Enter a valid Indian mobile number (starts with 6-9).";
+  }
+  if (Number(body.age) < 18 && !isValidIndianMobile(body.guardianContact)) {
+    return "For patients below 18, a valid guardian mobile number is required.";
+  }
   return "";
 }
 
@@ -80,6 +90,8 @@ async function signupPatient(req, res) {
   }
 
   const mobile = normalizeMobile(req.body.mobile);
+  const guardianContact = req.body.guardianContact ? normalizeMobile(req.body.guardianContact) : null;
+  const resolvedEmergency = guardianContact || req.body.emergencyContact?.trim() || null;
   const email = req.body.email ? normalizeEmail(req.body.email) : null;
 
   const client = await pool.connect();
@@ -115,7 +127,7 @@ async function signupPatient(req, res) {
         mobile,
         email,
         req.body.address?.trim() || null,
-        req.body.emergencyContact?.trim() || null,
+        resolvedEmergency,
         req.body.bloodGroup?.trim() || null,
         req.body.allergies?.trim() || null,
         req.body.chronicConditions?.trim() || null,
@@ -164,6 +176,8 @@ async function createAssistedPatientAccount(req, res) {
   }
 
   const mobile = req.body.mobile ? normalizeMobile(req.body.mobile) : null;
+  const guardianContact = req.body.guardianContact ? normalizeMobile(req.body.guardianContact) : null;
+  const resolvedEmergency = guardianContact || req.body.emergencyContact?.trim() || null;
   const email = req.body.email ? normalizeEmail(req.body.email) : null;
 
   const client = await pool.connect();
@@ -202,7 +216,7 @@ async function createAssistedPatientAccount(req, res) {
         mobile,
         email,
         req.body.address?.trim() || null,
-        req.body.emergencyContact?.trim() || null,
+        resolvedEmergency,
         req.body.bloodGroup?.trim() || null,
         req.body.allergies?.trim() || null,
         req.body.chronicConditions?.trim() || null,
@@ -271,6 +285,9 @@ async function requestPatientOtp(req, res) {
   if (!identifier.value) {
     return res.status(400).json({ error: "Email or mobile is required." });
   }
+  if (identifier.type === "mobile" && !isValidIndianMobile(identifier.value)) {
+    return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
+  }
 
   try {
     const query = identifier.type === "email" ? "pa.email = $1" : "pa.mobile = $1";
@@ -307,6 +324,9 @@ async function verifyPatientOtp(req, res) {
 
   if (!identifier.value || !otp) {
     return res.status(400).json({ error: "Identifier and OTP are required." });
+  }
+  if (identifier.type === "mobile" && !isValidIndianMobile(identifier.value)) {
+    return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
   }
 
   try {

@@ -628,6 +628,13 @@ async function createAppointment(req, res) {
     });
     const priorityLevel = prioritySuggestion.suggestedPriorityLevel;
 
+    if (normalizedPreferredSlot && (priorityLevel <= 2 || Number(pain_scale) >= 5)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Emergency or high-priority cases cannot be advance-booked. Please proceed as immediate visit.",
+      });
+    }
+
     const appointmentResult = await client.query(
       `
         INSERT INTO appointments (

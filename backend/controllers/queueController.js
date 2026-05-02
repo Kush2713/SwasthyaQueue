@@ -341,7 +341,9 @@ const callNextPatient = async (req, res) => {
       `
         SELECT *
         FROM queue
-        WHERE department_id = $1 AND status = 'waiting'
+        WHERE department_id = $1
+          AND status = 'waiting'
+          AND COALESCE(urgent_review_requested, FALSE) = FALSE
         ORDER BY priority_level ASC, token_number ASC
         LIMIT 1
       `,
@@ -610,7 +612,6 @@ const approvePriorityOverride = async (req, res) => {
         UPDATE queue
         SET priority_level = $2,
             urgent_review_requested = FALSE,
-            status = CASE WHEN status = 'waiting' THEN 'in-progress' ELSE status END,
             escalated_at = CURRENT_TIMESTAMP,
             escalated_by_role = $3,
             escalated_by_name = $4,
@@ -620,16 +621,6 @@ const approvePriorityOverride = async (req, res) => {
         RETURNING *
       `,
       [queueId, priorityLevel, escalatedByRole, escalatedByName, escalationNote || null]
-    );
-
-    await pool.query(
-      `
-        UPDATE appointments
-        SET status = CASE WHEN status = 'queued' THEN 'in-progress' ELSE status END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = $1
-      `,
-      [result.rows[0].appointment_id]
     );
 
     if (!result.rows.length) {
@@ -657,6 +648,96 @@ const approvePriorityOverride = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Unable to update queue priority right now." });
+  }
+};
+
+const getDisplayBoard = async (_req, res) => {
+  try {
+    const departmentResult = await pool.query(
+      `
+        SELECT department_id, name, avg_consult_time
+        FROM departments
+        ORDER BY department_id ASC
+      `
+    );
+
+    const queueResult = await pool.query(
+      `
+        SELECT
+          q.queue_id,
+          q.department_id,
+          q.token_number,
+          q.priority_level,
+          q.status,
+          q.created_at,
+          p.name AS patient_name
+        FROM queue q
+        JOIN patients p ON p.patient_id = q.patient_id
+        WHERE q.status IN ('waiting', 'in-progress')
+        ORDER BY q.department_id ASC, q.priority_level ASC, q.token_number ASC
+      `
+    );
+
+    const queueByDepartment = new Map();
+    for (const row of queueResult.rows) {
+      if (!queueByDepartment.has(row.department_id)) {
+        queueByDepartment.set(row.department_id, []);
+      }
+      queueByDepartment.get(row.department_id).push(row);
+    }
+
+    const board = departmentResult.rows.map((department) => {
+      const rows = queueByDepartment.get(department.department_id) || [];
+      const waitingRows = rows.filter((item) => item.status === "waiting");
+      const inProgress = rows.find((item) => item.status === "in-progress") || null;
+      const current = inProgress || waitingRows[0] || null;
+      const next = inProgress ? waitingRows[0] || null : waitingRows[1] || waitingRows[0] || null;
+
+      return {
+        department_id: department.department_id,
+        department_name: department.name,
+        avg_consult_time: department.avg_consult_time,
+        waiting_count: waitingRows.length,
+        current: current
+          ? {
+              queue_id: current.queue_id,
+              token_number: current.token_number,
+              token_label: formatTokenLabel({
+                departmentName: department.name,
+                departmentId: department.department_id,
+                queueCreatedAt: current.created_at,
+                tokenNumber: current.token_number,
+              }),
+              priority_level: current.priority_level,
+              status: current.status,
+              patient_name: current.patient_name,
+            }
+          : null,
+        next: next
+          ? {
+              queue_id: next.queue_id,
+              token_number: next.token_number,
+              token_label: formatTokenLabel({
+                departmentName: department.name,
+                departmentId: department.department_id,
+                queueCreatedAt: next.created_at,
+                tokenNumber: next.token_number,
+              }),
+              priority_level: next.priority_level,
+              status: next.status,
+              patient_name: next.patient_name,
+            }
+          : null,
+      };
+    });
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      departments: board,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to load display board right now." });
   }
 };
 
@@ -714,7 +795,6 @@ const confirmPrioritySuggestion = async (req, res) => {
         UPDATE queue
         SET priority_level = $2,
             urgent_review_requested = FALSE,
-            status = CASE WHEN status = 'waiting' THEN 'in-progress' ELSE status END,
             escalated_at = CURRENT_TIMESTAMP,
             escalated_by_role = $3,
             escalated_by_name = $4,
@@ -723,16 +803,6 @@ const confirmPrioritySuggestion = async (req, res) => {
         RETURNING *
       `,
       [queueId, finalPriority, actor.role || "nurse", actor.name || "Triage Nurse", note || null]
-    );
-
-    await pool.query(
-      `
-        UPDATE appointments
-        SET status = CASE WHEN status = 'queued' THEN 'in-progress' ELSE status END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = $1
-      `,
-      [current.appointment_id]
     );
 
     await logWorkflowEvent(pool, {
@@ -1005,6 +1075,7 @@ module.exports = {
   callNextPatient,
   completePatient,
   getStats,
+  getDisplayBoard,
   getPosition,
   flagUrgentReview,
   approvePriorityOverride,

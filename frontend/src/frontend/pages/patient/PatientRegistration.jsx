@@ -102,13 +102,9 @@ function getTodayDateValue() {
   return `${year}-${month}-${day}`;
 }
 
-function getTomorrowDateValue() {
-  const next = new Date();
-  next.setDate(next.getDate() + 1);
-  const year = next.getFullYear();
-  const month = String(next.getMonth() + 1).padStart(2, "0");
-  const day = String(next.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function getCurrentMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
 }
 
 export default function PatientRegistration({ onBack, user, onRegistered }) {
@@ -210,10 +206,21 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     if ((form.preferredDate && !form.preferredTime) || (!form.preferredDate && form.preferredTime)) {
       return "Select both preferred date and preferred time, or leave both empty.";
     }
+    if (form.preferredDate && (risk.priority !== "Normal" || Number(form.painScale) >= 5)) {
+      return "Emergency or high-priority cases cannot be advance booked. Please continue without preferred slot.";
+    }
     if (form.preferredDate) {
       const today = getTodayDateValue();
-      if (form.preferredDate <= today) {
-        return "Preferred appointment date must be after today.";
+      if (form.preferredDate < today) {
+        return "Preferred appointment date cannot be in the past.";
+      }
+      if (form.preferredDate === today && form.preferredTime) {
+        const [hourText, minuteText] = String(form.preferredTime).split(":");
+        const slotMinutes = Number(hourText) * 60 + Number(minuteText);
+        const nextHourStart = Math.ceil(getCurrentMinutes() / 60) * 60;
+        if (slotMinutes < nextHourStart) {
+          return "For today, choose a slot from the next hour onward.";
+        }
       }
     }
     return "";
@@ -524,7 +531,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                   <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...availableDepartments]} /></Field>
                   <Row2Col>
                     <Field label="Preferred Date (optional)">
-                      <input type="date" min={getTomorrowDateValue()} value={form.preferredDate} onChange={(event) => setField("preferredDate", event.target.value)} style={inputStyle} />
+                      <input type="date" min={getTodayDateValue()} value={form.preferredDate} onChange={(event) => setField("preferredDate", event.target.value)} style={inputStyle} />
                     </Field>
                     <Field label="Preferred Time (optional)">
                       <select value={form.preferredTime} onChange={(event) => setField("preferredTime", event.target.value)} style={inputStyle}>
