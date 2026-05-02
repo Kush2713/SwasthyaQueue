@@ -713,6 +713,7 @@ async function createAppointment(req, res) {
 
 async function createQuickIntake(req, res) {
   const {
+    patient_id,
     name,
     age,
     gender,
@@ -725,7 +726,9 @@ async function createQuickIntake(req, res) {
   } = req.body;
 
   if (!name?.trim() || !department_id) {
-    return res.status(400).json({ error: "Patient name and department are required for quick intake." });
+    if (!Number.isFinite(Number(patient_id))) {
+      return res.status(400).json({ error: "Patient name and department are required for quick intake." });
+    }
   }
 
   const client = await pool.connect();
@@ -746,36 +749,55 @@ async function createQuickIntake(req, res) {
       return res.status(400).json({ error: "Selected department is not available." });
     }
 
-    const normalizedMobile = normalizeOptionalPhone(mobile);
-    const normalizedEmergency = normalizeOptionalPhone(emergency_contact);
-
-    const patientResult = await client.query(
-      `
-        INSERT INTO patients (name, age, gender, phone, address, emergency_contact)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-      `,
-      [
-        name.trim(),
-        Number(age) || 0,
-        gender || null,
-        normalizedMobile,
-        address?.trim() || null,
-        normalizedEmergency,
-      ]
-    );
-
-    const patient = patientResult.rows[0];
-
-    if (normalizedMobile) {
-      await client.query(
+    let patient = null;
+    const providedPatientId = Number(patient_id);
+    if (Number.isFinite(providedPatientId) && providedPatientId > 0) {
+      const patientResult = await client.query(
         `
-          INSERT INTO patient_accounts (patient_id, mobile, account_source, created_by_role, created_by_name)
-          VALUES ($1, $2, 'staff-assisted', 'receptionist', $3)
-          ON CONFLICT (mobile) DO NOTHING
+          SELECT *
+          FROM patients
+          WHERE patient_id = $1
+          LIMIT 1
         `,
-        [patient.patient_id, normalizedMobile, String(created_by_name || "Front Desk").trim() || "Front Desk"]
+        [providedPatientId]
       );
+      if (!patientResult.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Selected patient was not found." });
+      }
+      patient = patientResult.rows[0];
+    } else {
+      const normalizedMobile = normalizeOptionalPhone(mobile);
+      const normalizedEmergency = normalizeOptionalPhone(emergency_contact);
+
+      const patientResult = await client.query(
+        `
+          INSERT INTO patients (name, age, gender, phone, address, emergency_contact)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *
+        `,
+        [
+          name.trim(),
+          Number(age) || 0,
+          gender || null,
+          normalizedMobile,
+          address?.trim() || null,
+          normalizedEmergency,
+        ]
+      );
+
+      patient = patientResult.rows[0];
+
+      if (normalizedMobile) {
+        await client.query(
+          `
+            INSERT INTO patient_accounts (patient_id, mobile, account_source, created_by_role, created_by_name)
+            VALUES ($1, $2, 'staff-assisted', 'receptionist', $3)
+            ON CONFLICT (mobile) DO NOTHING
+          `,
+          [patient.patient_id, normalizedMobile, String(created_by_name || "Front Desk").trim() || "Front Desk"]
+        );
+      }
     }
 
     const patientAge = Number(patient.age) || 0;
@@ -836,7 +858,8 @@ async function createQuickIntake(req, res) {
         symptoms: appointment.symptoms,
         priorityLevel,
         prioritySuggestion,
-        mobileCaptured: Boolean(normalizedMobile),
+        mobileCaptured: Boolean(patient.phone),
+        existingPatientUsed: Number.isFinite(providedPatientId) && providedPatientId > 0,
       },
     });
 

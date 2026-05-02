@@ -16,7 +16,6 @@ const signupDefaults = {
   age: "",
   gender: "",
   mobile: "",
-  guardianContact: "",
   email: "",
   address: "",
   bloodGroup: "",
@@ -127,9 +126,6 @@ export default function LoginPage({ onLogin }) {
     }
     if (!signupForm.gender) nextErrors.gender = "Gender is required.";
     if (!isValidIndianMobile(signupForm.mobile)) nextErrors.mobile = "Enter a valid Indian mobile number.";
-    if (Number(signupForm.age) < 18 && !isValidIndianMobile(signupForm.guardianContact || "")) {
-      nextErrors.guardianContact = "Guardian mobile is required for below 18.";
-    }
     if (Object.keys(nextErrors).length) {
       setFieldErrors(nextErrors);
       setLoading(false);
@@ -141,7 +137,6 @@ export default function LoginPage({ onLogin }) {
         ...signupForm,
         age: Number(signupForm.age),
         mobile: normalizeMobile(signupForm.mobile),
-        guardianContact: normalizeMobile(signupForm.guardianContact || ""),
       });
 
       const resolvedIdentifier = signupForm.email.trim() || normalizeMobile(signupForm.mobile);
@@ -355,10 +350,6 @@ export default function LoginPage({ onLogin }) {
                         <Field label="Mobile *">
                           <input className={inputStyle} value={signupForm.mobile} onChange={(event) => setSignupField("mobile", normalizeMobile(event.target.value))} placeholder="9876543210" />
                           {fieldErrors.mobile ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.mobile}</div> : null}
-                        </Field>
-                        <Field label="Guardian Mobile (if below 18)">
-                          <input className={inputStyle} value={signupForm.guardianContact || ""} onChange={(event) => setSignupField("guardianContact", normalizeMobile(event.target.value))} placeholder="Guardian number for minor patients" />
-                          {fieldErrors.guardianContact ? <div className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.guardianContact}</div> : null}
                         </Field>
                         <Field label="Email">
                           <input className={inputStyle} value={signupForm.email} onChange={(event) => setSignupField("email", event.target.value)} placeholder="you@example.com" />

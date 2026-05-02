@@ -63,10 +63,7 @@ const updatePatientProfile = async (req, res) => {
     }
     if (!gender?.trim()) return res.status(400).json({ error: "Gender is required." });
     if (!isValidIndianMobile(normalizedMobile)) {
-      return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
-    }
-    if (Number(age) < 18 && !isValidIndianMobile(normalizedEmergency)) {
-      return res.status(400).json({ error: "For patients below 18, a valid guardian mobile number is required." });
+      return res.status(400).json({ error: "Enter a valid Indian mobile number." });
     }
 
     const result = await pool.query(
@@ -165,10 +162,7 @@ const updatePatientProfileById = async (req, res) => {
     }
     if (!gender?.trim()) return res.status(400).json({ error: "Gender is required." });
     if (!isValidIndianMobile(normalizedMobile)) {
-      return res.status(400).json({ error: "Enter a valid Indian mobile number (starts with 6-9)." });
-    }
-    if (Number(age) < 18 && !isValidIndianMobile(normalizedEmergency)) {
-      return res.status(400).json({ error: "For patients below 18, a valid guardian mobile number is required." });
+      return res.status(400).json({ error: "Enter a valid Indian mobile number." });
     }
 
     const result = await pool.query(

@@ -23,10 +23,6 @@ function isEmergencyDepartment(name = "") {
   return String(name).toLowerCase().includes("emerg");
 }
 
-function EmergencyPill() {
-  return <span style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 999, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>Emergency</span>;
-}
-
 function clockText() {
   const date = new Date();
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -99,6 +95,8 @@ export default function ReceptionDashboard({ user, onLogout }) {
     address: "",
   });
   const [assistedState, setAssistedState] = useState({ loading: false, error: "", success: null });
+  const [assistedCaseForm, setAssistedCaseForm] = useState({ departmentId: "", symptoms: "" });
+  const [assistedCaseState, setAssistedCaseState] = useState({ loading: false, error: "", success: "" });
   const [activeOverlay, setActiveOverlay] = useState("");
   const allowedDepartmentIds = useMemo(() => getAllowedDepartmentIds(user), [user]);
   const [quickIntakeForm, setQuickIntakeForm] = useState({
@@ -338,11 +336,45 @@ export default function ReceptionDashboard({ user, onLogout }) {
         emergencyContact: "",
         address: "",
       });
+      setAssistedCaseForm({ departmentId: "", symptoms: "" });
+      setAssistedCaseState({ loading: false, error: "", success: "" });
     } catch (err) {
       setAssistedState({
         loading: false,
         error: err.message || "Unable to create assisted patient account.",
         success: null,
+      });
+    }
+  };
+
+  const handleCreateCaseForAssisted = async (event) => {
+    event.preventDefault();
+    const patientId = Number(assistedState.success?.patient?.patient_id);
+    if (!Number.isFinite(patientId)) return;
+    if (!assistedCaseForm.departmentId) {
+      setAssistedCaseState({ loading: false, error: "Select a department to create case.", success: "" });
+      return;
+    }
+    setAssistedCaseState({ loading: true, error: "", success: "" });
+    try {
+      const { createQuickIntake } = await import("../../lib/api");
+      const response = await createQuickIntake({
+        patient_id: patientId,
+        department_id: Number(assistedCaseForm.departmentId),
+        symptoms: assistedCaseForm.symptoms || "Staff-assisted intake from reception",
+        created_by_name: user?.name || "Front Desk",
+      });
+      setAssistedCaseState({
+        loading: false,
+        error: "",
+        success: `Case created with token #${response.case.currentVisit.token} in ${response.case.currentVisit.department}.`,
+      });
+      await loadReceptionData();
+    } catch (err) {
+      setAssistedCaseState({
+        loading: false,
+        error: err.message || "Unable to create case for assisted patient.",
+        success: "",
       });
     }
   };
@@ -646,6 +678,29 @@ export default function ReceptionDashboard({ user, onLogout }) {
               </button>
               </div>
             </form>
+            {assistedState.success ? (
+              <form onSubmit={handleCreateCaseForAssisted} style={{ marginTop: 14, borderTop: "1px solid #E2E8F0", paddingTop: 12 }}>
+                <SectionTitle title="Create Case For This Patient" subtitle="Capture visit details and add patient to live queue now" />
+                {assistedCaseState.error ? <Notice tone="warn" text={assistedCaseState.error} /> : null}
+                {assistedCaseState.success ? <Notice tone="info" text={assistedCaseState.success} /> : null}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: 10 }}>
+                  <Field label="Department *">
+                    <select value={assistedCaseForm.departmentId} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, departmentId: event.target.value }))} style={inputStyle}>
+                      <option value="">Select Department</option>
+                      {departments.map((department) => <option key={`assisted-case-${department.department_id}`} value={department.department_id}>{department.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Symptoms / Quick Note">
+                    <input value={assistedCaseForm.symptoms} onChange={(event) => setAssistedCaseForm((prev) => ({ ...prev, symptoms: event.target.value }))} placeholder="Short symptom note for triage" style={inputStyle} />
+                  </Field>
+                </div>
+                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                  <button type="submit" disabled={assistedCaseState.loading} style={{ ...btnPrimary, opacity: assistedCaseState.loading ? 0.7 : 1, cursor: assistedCaseState.loading ? "not-allowed" : "pointer" }}>
+                    {assistedCaseState.loading ? "Adding..." : "Create Case & Add To Queue"}
+                  </button>
+                </div>
+              </form>
+            ) : null}
         </OverlayModal>
       ) : null}
 
@@ -754,18 +809,24 @@ function DepartmentCard({ department, active, onSelect, onCallNext }) {
 
 function QueueRow({ row, urgentForm, setUrgentForm, onUrgentReview, onCallNext, onOpenCase }) {
   const emergency = isEmergencyDepartment(row.department);
+  const highPriority = row.priority === "high";
+  const criticalPriority = row.priority === "critical";
+  const rowHighlight = emergency
+    ? { border: "#B91C1C", bg: "#FFF7F7", text: "#B91C1C" }
+    : highPriority
+      ? { border: "#D97706", bg: "#FFFBEB", text: "#92400E" }
+      : criticalPriority
+        ? { border: "#B91C1C", bg: "#FFF7F7", text: "#B91C1C" }
+        : { border: "transparent", bg: "#fff", text: "#334155" };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "80px 1.5fr 1.1fr 1fr 1fr 1fr 1.4fr", padding: "10px 12px", fontSize: 12, color: "#334155", borderBottom: "1px solid #E2E8F0", alignItems: "center", borderLeft: emergency ? "4px solid #B91C1C" : "4px solid transparent", background: emergency ? "#FFF7F7" : "#fff" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "80px 1.5fr 1.1fr 1fr 1fr 1fr 1.4fr", padding: "10px 12px", fontSize: 12, color: "#334155", borderBottom: "1px solid #E2E8F0", alignItems: "center", borderLeft: `4px solid ${rowHighlight.border}`, background: rowHighlight.bg }}>
       <div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{row.token}</div>
       <div>
         <div style={{ fontWeight: 700 }}>{row.name}</div>
         <div style={{ fontSize: 11, color: "#64748B" }}>ID {row.patientId}</div>
       </div>
       <div>{formatIndianMobile(row.mobile)}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ color: emergency ? "#B91C1C" : "#334155", fontWeight: emergency ? 700 : 500 }}>{row.department}</span>
-        {emergency ? <EmergencyPill /> : null}
-      </div>
+      <div style={{ color: rowHighlight.text, fontWeight: rowHighlight.text === "#334155" ? 500 : 700 }}>{row.department}</div>
       <div>{row.status}</div>
         <div>{row.peopleAhead}</div>
         <div>

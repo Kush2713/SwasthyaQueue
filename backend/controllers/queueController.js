@@ -603,8 +603,26 @@ const approvePriorityOverride = async (req, res) => {
     if (!departmentId) {
       return res.status(404).json({ error: "Queue entry not found for escalation." });
     }
-    if (!hasDepartmentAccess(req.auth, departmentId)) {
+    const isNurseOverride = req.auth?.role === "nurse";
+    if (!isNurseOverride && !hasDepartmentAccess(req.auth, departmentId)) {
       return res.status(403).json({ error: "You are not assigned to this department." });
+    }
+
+    const currentQueueResult = await pool.query(
+      `
+        SELECT queue_id, urgent_review_requested
+        FROM queue
+        WHERE queue_id = $1
+          AND status IN ('waiting', 'in-progress')
+        LIMIT 1
+      `,
+      [queueId]
+    );
+    if (!currentQueueResult.rows.length) {
+      return res.status(404).json({ error: "Queue entry not found for escalation." });
+    }
+    if (isNurseOverride && !currentQueueResult.rows[0].urgent_review_requested) {
+      return res.status(400).json({ error: "Nurse override is allowed only for urgent-review flagged cases." });
     }
 
     const result = await pool.query(
@@ -756,7 +774,8 @@ const confirmPrioritySuggestion = async (req, res) => {
     if (!departmentId) {
       return res.status(404).json({ error: "Queue entry not found for confirmation." });
     }
-    if (!hasDepartmentAccess(req.auth, departmentId)) {
+    const isNurseOverride = req.auth?.role === "nurse";
+    if (!isNurseOverride && !hasDepartmentAccess(req.auth, departmentId)) {
       return res.status(403).json({ error: "You are not assigned to this department." });
     }
 
@@ -778,6 +797,9 @@ const confirmPrioritySuggestion = async (req, res) => {
     }
 
     const current = queueResult.rows[0];
+    if (isNurseOverride && !current.urgent_review_requested) {
+      return res.status(400).json({ error: "Nurse override is allowed only for urgent-review flagged cases." });
+    }
     const suggestion = await analyzePrioritySuggestion({
       symptoms: current.symptoms,
       painScale: current.pain_scale,

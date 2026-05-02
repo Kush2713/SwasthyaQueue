@@ -34,7 +34,8 @@ export const OPD = {
 export function getOpdSlotOptions() {
   const slots = [];
   const step = Math.max(5, OPD.intervalMinutes);
-  for (let value = OPD.startMinutes; value < OPD.endMinutes; value += step) {
+  const lastAllowedSlot = Math.min(OPD.endMinutes - step, 21 * 60);
+  for (let value = OPD.startMinutes; value <= lastAllowedSlot; value += step) {
     slots.push(toHHMM(value));
   }
   return slots;
