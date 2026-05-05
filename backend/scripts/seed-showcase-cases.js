@@ -35,37 +35,37 @@ async function maybeReset(client, shouldReset) {
 }
 
 const patients = [
-  { key: "gm_t1", name: "Test1 Arjun Rao", age: 29, gender: "Male", mobile: "9876501001", email: "test1.gm@tempmail.com", address: "Vijayawada" },
-  { key: "gm_t2", name: "Test2 Neha Iyer", age: 34, gender: "Female", mobile: "9876501002", email: "test2.gm@tempmail.com", address: "Guntur" },
-  { key: "gm_t3", name: "Test3 Ravi Kumar", age: 41, gender: "Male", mobile: null, email: "test3.gm@tempmail.com", address: "NTR District", assisted: true },
-  { key: "gm_t4", name: "Test4 Priya Menon", age: 38, gender: "Female", mobile: "9876501004", email: "test4.gm@tempmail.com", address: "Tenali" },
+  { key: "gm_t1", name: "Arjun Rao", age: 29, gender: "Male", mobile: "9876501001", email: "test1.gm@tempmail.com", address: "Vijayawada" },
+  { key: "gm_t2", name: "Neha Iyer", age: 34, gender: "Female", mobile: "9876501002", email: "test2.gm@tempmail.com", address: "Guntur" },
+  { key: "gm_t3", name: "Ravi Kumar", age: 41, gender: "Male", mobile: null, email: "test3.gm@tempmail.com", address: "NTR District", assisted: true },
+  { key: "gm_t4", name: "Priya Menon", age: 38, gender: "Female", mobile: "9876501004", email: "test4.gm@tempmail.com", address: "Tenali" },
 
-  { key: "cd_t1", name: "Test1 Ajay Verma", age: 56, gender: "Male", mobile: "9876502001", email: "test1.cd@tempmail.com", address: "Vijayawada" },
-  { key: "cd_t2", name: "Test2 Meera Nair", age: 49, gender: "Female", mobile: "9876502002", email: "test2.cd@tempmail.com", address: "Mangalagiri" },
-  { key: "cd_t3", name: "Test3 Farhan Ali", age: 61, gender: "Male", mobile: null, email: "test3.cd@tempmail.com", address: "NTR District", assisted: true },
-  { key: "cd_t4", name: "Test4 Sahana Reddy", age: 45, gender: "Female", mobile: "9876502004", email: "test4.cd@tempmail.com", address: "Guntur" },
+  { key: "cd_t1", name: "Ajay Verma", age: 56, gender: "Male", mobile: "9876502001", email: "test1.cd@tempmail.com", address: "Vijayawada" },
+  { key: "cd_t2", name: "Meera Nair", age: 49, gender: "Female", mobile: "9876502002", email: "test2.cd@tempmail.com", address: "Mangalagiri" },
+  { key: "cd_t3", name: "Farhan Ali", age: 61, gender: "Male", mobile: null, email: "test3.cd@tempmail.com", address: "NTR District", assisted: true },
+  { key: "cd_t4", name: "Sahana Reddy", age: 45, gender: "Female", mobile: "9876502004", email: "test4.cd@tempmail.com", address: "Guntur" },
 
-  { key: "or_t1", name: "Test1 Nitin Das", age: 33, gender: "Male", mobile: "9876503001", email: "test1.or@tempmail.com", address: "Vijayawada" },
-  { key: "or_t2", name: "Test2 Kavya Shah", age: 27, gender: "Female", mobile: "9876503002", email: "test2.or@tempmail.com", address: "Tenali" },
-  { key: "or_t3", name: "Test3 Gauri Patil", age: 31, gender: "Female", mobile: null, email: "test3.or@tempmail.com", address: "NTR District", assisted: true },
-  { key: "or_t4", name: "Test4 Harish Pillai", age: 44, gender: "Male", mobile: "9876503004", email: "test4.or@tempmail.com", address: "Guntur" },
+  { key: "or_t1", name: "Nitin Das", age: 33, gender: "Male", mobile: "9876503001", email: "test1.or@tempmail.com", address: "Vijayawada" },
+  { key: "or_t2", name: "Kavya Shah", age: 27, gender: "Female", mobile: "9876503002", email: "test2.or@tempmail.com", address: "Tenali" },
+  { key: "or_t3", name: "Gauri Patil", age: 31, gender: "Female", mobile: null, email: "test3.or@tempmail.com", address: "NTR District", assisted: true },
+  { key: "or_t4", name: "Harish Pillai", age: 44, gender: "Male", mobile: "9876503004", email: "test4.or@tempmail.com", address: "Guntur" },
 
-  { key: "pd_t1", name: "Test1 Aarav Singh", age: 9, gender: "Male", mobile: "9876504001", email: "test1.pd@tempmail.com", address: "Vijayawada" },
-  { key: "pd_t2", name: "Test2 Isha Kapoor", age: 7, gender: "Female", mobile: "9876504002", email: "test2.pd@tempmail.com", address: "Tenali" },
-  { key: "pd_t3", name: "Test3 Omkar Das", age: 11, gender: "Male", mobile: null, email: "test3.pd@tempmail.com", address: "NTR District", assisted: true },
-  { key: "pd_t4", name: "Test4 Naina Thomas", age: 8, gender: "Female", mobile: "9876504004", email: "test4.pd@tempmail.com", address: "Guntur" },
+  { key: "pd_t1", name: "Aarav Singh", age: 9, gender: "Male", mobile: "9876504001", email: "test1.pd@tempmail.com", address: "Vijayawada" },
+  { key: "pd_t2", name: "Isha Kapoor", age: 7, gender: "Female", mobile: "9876504002", email: "test2.pd@tempmail.com", address: "Tenali" },
+  { key: "pd_t3", name: "Omkar Das", age: 11, gender: "Male", mobile: null, email: "test3.pd@tempmail.com", address: "NTR District", assisted: true },
+  { key: "pd_t4", name: "Naina Thomas", age: 8, gender: "Female", mobile: "9876504004", email: "test4.pd@tempmail.com", address: "Guntur" },
 
-  { key: "em_t1", name: "Test1 Sana Begum", age: 28, gender: "Female", mobile: "9876505001", email: "test1.em@tempmail.com", address: "Vijayawada" },
-  { key: "em_t2", name: "Test2 Suresh Reddy", age: 63, gender: "Male", mobile: "9876505002", email: "test2.em@tempmail.com", address: "Mangalagiri" },
-  { key: "em_t3", name: "Test3 Anita Paul", age: 36, gender: "Female", mobile: null, email: "test3.em@tempmail.com", address: "NTR District", assisted: true },
-  { key: "em_t4", name: "Test4 Dev Malhotra", age: 40, gender: "Male", mobile: "9876505004", email: "test4.em@tempmail.com", address: "Guntur" },
+  { key: "em_t1", name: "Sana Begum", age: 28, gender: "Female", mobile: "9876505001", email: "test1.em@tempmail.com", address: "Vijayawada" },
+  { key: "em_t2", name: "Suresh Reddy", age: 63, gender: "Male", mobile: "9876505002", email: "test2.em@tempmail.com", address: "Mangalagiri" },
+  { key: "em_t3", name: "Anita Paul", age: 36, gender: "Female", mobile: null, email: "test3.em@tempmail.com", address: "NTR District", assisted: true },
+  { key: "em_t4", name: "Dev Malhotra", age: 40, gender: "Male", mobile: "9876505004", email: "test4.em@tempmail.com", address: "Guntur" },
 
   // Future-date booking validation patients
-  { key: "gm_adv", name: "Test1 Future GM", age: 30, gender: "Male", mobile: "9876591001", email: "future.gm@tempmail.com", address: "Vijayawada" },
-  { key: "cd_adv", name: "Test1 Future CD", age: 52, gender: "Female", mobile: "9876592001", email: "future.cd@tempmail.com", address: "Guntur" },
-  { key: "or_adv", name: "Test1 Future OR", age: 36, gender: "Male", mobile: "9876593001", email: "future.or@tempmail.com", address: "NTR District" },
-  { key: "pd_adv", name: "Test1 Future PD", age: 10, gender: "Female", mobile: "9876594001", email: "future.pd@tempmail.com", address: "Tenali" },
-  { key: "em_adv", name: "Test1 Future EM", age: 44, gender: "Male", mobile: "9876595001", email: "future.em@tempmail.com", address: "Mangalagiri" },
+  { key: "gm_adv", name: "Mohan Reddy", age: 30, gender: "Male", mobile: "9876591001", email: "future.gm@tempmail.com", address: "Vijayawada" },
+  { key: "cd_adv", name: "Lata Sharma", age: 52, gender: "Female", mobile: "9876592001", email: "future.cd@tempmail.com", address: "Guntur" },
+  { key: "or_adv", name: "Kiran Naik", age: 36, gender: "Male", mobile: "9876593001", email: "future.or@tempmail.com", address: "NTR District" },
+  { key: "pd_adv", name: "Diya Kapoor", age: 10, gender: "Female", mobile: "9876594001", email: "future.pd@tempmail.com", address: "Tenali" },
+  { key: "em_adv", name: "Rakesh Verma", age: 44, gender: "Male", mobile: "9876595001", email: "future.em@tempmail.com", address: "Mangalagiri" },
 ];
 
 const visits = [
