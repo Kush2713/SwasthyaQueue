@@ -61,6 +61,17 @@ function buildAssistedReference() {
   return `ASST-${stamp}-${random}`;
 }
 
+async function applyConsolidatedNurseAccess(user) {
+  if (!user || user.role !== "nurse" || user.userId !== "nurse01") return user;
+  const departments = await pool.query("SELECT department_id FROM departments ORDER BY department_id ASC");
+  const ids = departments.rows.map((row) => Number(row.department_id)).filter((id) => Number.isFinite(id));
+  return {
+    ...user,
+    assignedDepartmentIds: ids,
+    primaryDepartmentId: ids[0] || null,
+  };
+}
+
 async function storeOtp(db, accountId) {
   const otp = generateOtpCode();
   await db.query(
@@ -437,6 +448,10 @@ async function loginStaff(req, res) {
     return res.status(401).json({ error: "Invalid staff credentials." });
   }
 
+  if (source === "db") {
+    matchedUser = await applyConsolidatedNurseAccess(matchedUser);
+  }
+
   const token = issueAuthToken({
     staffId: matchedUser.staffId,
     userId: matchedUser.userId,
@@ -477,8 +492,9 @@ async function getCurrentSession(req, res) {
     try {
       const dbStaff = await getStaffAccountByUserId(pool, req.auth.user_id);
       if (dbStaff && dbStaff.active) {
+        const scopedStaff = await applyConsolidatedNurseAccess(dbStaff);
         return res.json({
-          user: sanitizeStaffAccount(dbStaff, token),
+          user: sanitizeStaffAccount(scopedStaff, token),
         });
       }
     } catch (error) {

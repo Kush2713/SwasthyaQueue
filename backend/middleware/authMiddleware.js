@@ -104,6 +104,10 @@ function getActorFromRequest(req, fallback = {}) {
 }
 
 function getAssignedDepartmentIdsFromAuth(auth) {
+  // Consolidated nurse profile: nurse01 can operate across departments.
+  if (auth?.role === "nurse" && auth?.user_id === "nurse01") {
+    return [];
+  }
   const ids = Array.isArray(auth?.assigned_department_ids) ? auth.assigned_department_ids : [];
   return Array.from(new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))));
 }

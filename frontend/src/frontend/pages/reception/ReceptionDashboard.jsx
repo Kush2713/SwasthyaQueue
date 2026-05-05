@@ -78,6 +78,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const [clock, setClock] = useState("");
   const [screenState, setScreenState] = useState("loading");
   const [loadError, setLoadError] = useState("");
+  const [actionInfo, setActionInfo] = useState("");
   const [departments, setDepartments] = useState([]);
   const [queueRows, setQueueRows] = useState([]);
   const [query, setQuery] = useState("");
@@ -300,12 +301,24 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const callNextForDepartment = async (departmentId) => {
     try {
       const { callNextPatient } = await import("../../lib/api");
-      await callNextPatient({ department_id: departmentId, date: queueDate });
+      const response = await callNextPatient({ department_id: departmentId, date: queueDate });
+      if (response?.message === "No patients in queue") {
+        setActionInfo("No waiting patient in this department for selected date.");
+      } else {
+        const calledToken = response?.patient?.token_number ? `#${response.patient.token_number}` : "next patient";
+        setActionInfo(`Called ${calledToken} successfully.`);
+      }
       await loadReceptionData();
     } catch (err) {
       setLoadError(err.message || "Unable to call the next patient right now.");
     }
   };
+
+  useEffect(() => {
+    if (!actionInfo) return;
+    const timer = setTimeout(() => setActionInfo(""), 2500);
+    return () => clearTimeout(timer);
+  }, [actionInfo]);
 
   const setAssistedField = (key, value) => {
     setAssistedForm((prev) => ({ ...prev, [key]: value }));
@@ -448,6 +461,18 @@ export default function ReceptionDashboard({ user, onLogout }) {
       <GovHeader name={user?.name || "Receptionist"} clock={clock} designation={user?.designation} />
 
       <main style={{ maxWidth: 1080, margin: "0 auto", padding: "14px 12px 24px", display: "grid", gap: 12 }}>
+        {loadError ? (
+          <section style={{ border: "1px solid #FECACA", background: "#FEF2F2", color: "#991B1B", borderRadius: 10, padding: "8px 10px", fontSize: 13, fontWeight: 700 }}>
+            {loadError}
+          </section>
+        ) : null}
+
+        {actionInfo ? (
+          <section style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1E3A8A", borderRadius: 10, padding: "8px 10px", fontSize: 13, fontWeight: 700 }}>
+            {actionInfo}
+          </section>
+        ) : null}
+
         <section style={{ background: COLORS.navy, color: "#fff", borderRadius: 12, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
             <div>

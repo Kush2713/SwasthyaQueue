@@ -367,11 +367,11 @@ const callNextPatient = async (req, res) => {
         SELECT *
         FROM queue
         LEFT JOIN appointments a ON a.appointment_id = queue.appointment_id
-        WHERE department_id = $1
-          AND status = 'waiting'
+        WHERE queue.department_id = $1
+          AND queue.status = 'waiting'
           AND COALESCE(urgent_review_requested, FALSE) = FALSE
           AND (COALESCE(a.preferred_slot, queue.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $2::date
-        ORDER BY priority_level ASC, token_number ASC
+        ORDER BY queue.priority_level ASC, queue.token_number ASC
         LIMIT 1
       `,
       [departmentId, queueDate]
