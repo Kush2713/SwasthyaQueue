@@ -232,8 +232,8 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     if ((form.preferredDate && !form.preferredTime) || (!form.preferredDate && form.preferredTime)) {
       return "Select both preferred date and preferred time, or leave both empty.";
     }
-    if (form.preferredDate && (risk.priority !== "Normal" || Number(form.painScale) >= 5)) {
-      return "Emergency or high-priority cases cannot be advance booked. Please continue without preferred slot.";
+    if (form.preferredDate && Number(form.painScale) > 5) {
+      return "Pain level above 5 cannot be advance booked. Please continue without preferred slot.";
     }
     if (form.preferredDate) {
       const today = getTodayDateValue();
@@ -683,7 +683,12 @@ export function computeRisk(checkedSymptoms, age, gender, painScale) {
   for (const symptom of checkedSymptoms) {
     const current = symptomMap[symptom];
     if (!current) continue;
-    score += current.score;
+    let symptomScore = current.score;
+    // "Child Fever" should not over-escalate adults.
+    if (symptom === "Child Fever" && Number.isFinite(ageNum) && ageNum >= 15) {
+      symptomScore = 1;
+    }
+    score += symptomScore;
     if (current.critical) critical = true;
     if (department === "General Medicine" && current.department !== "General Medicine") {
       department = current.department;
@@ -699,7 +704,7 @@ export function computeRisk(checkedSymptoms, age, gender, painScale) {
   let priority = "Normal";
 
   if (critical || score >= 8) priority = "Critical";
-  else if (score >= 4 || ageNum >= 60 || (ageNum >= 0 && ageNum < 5)) priority = "High";
+  else if (score >= 7 || ageNum >= 60 || (ageNum >= 0 && ageNum < 5)) priority = "High";
 
   return { score, priority, suggestedDepartment: department, painSeverity, gender };
 }
