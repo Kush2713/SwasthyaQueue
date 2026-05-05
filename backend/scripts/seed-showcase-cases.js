@@ -59,6 +59,13 @@ const patients = [
   { key: "em_t2", name: "Test2 Suresh Reddy", age: 63, gender: "Male", mobile: "9876505002", email: "test2.em@tempmail.com", address: "Mangalagiri" },
   { key: "em_t3", name: "Test3 Anita Paul", age: 36, gender: "Female", mobile: null, email: "test3.em@tempmail.com", address: "NTR District", assisted: true },
   { key: "em_t4", name: "Test4 Dev Malhotra", age: 40, gender: "Male", mobile: "9876505004", email: "test4.em@tempmail.com", address: "Guntur" },
+
+  // Future-date booking validation patients
+  { key: "gm_adv", name: "Test1 Future GM", age: 30, gender: "Male", mobile: "9876591001", email: "future.gm@tempmail.com", address: "Vijayawada" },
+  { key: "cd_adv", name: "Test1 Future CD", age: 52, gender: "Female", mobile: "9876592001", email: "future.cd@tempmail.com", address: "Guntur" },
+  { key: "or_adv", name: "Test1 Future OR", age: 36, gender: "Male", mobile: "9876593001", email: "future.or@tempmail.com", address: "NTR District" },
+  { key: "pd_adv", name: "Test1 Future PD", age: 10, gender: "Female", mobile: "9876594001", email: "future.pd@tempmail.com", address: "Tenali" },
+  { key: "em_adv", name: "Test1 Future EM", age: 44, gender: "Male", mobile: "9876595001", email: "future.em@tempmail.com", address: "Mangalagiri" },
 ];
 
 const visits = [
@@ -101,11 +108,11 @@ function getTomorrowAt(hour, minute = 0) {
 }
 
 const futureVisits = [
-  { patientKey: "gm_t1", department: "General Medicine", symptoms: "Advance follow-up booking", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 2, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(10, 0), mode: "advance-booking" },
-  { patientKey: "cd_t1", department: "Cardiology", symptoms: "Advance cardiology review", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 3, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(11, 0), mode: "advance-booking" },
-  { patientKey: "or_t1", department: "Orthopedics", symptoms: "Advance ortho follow-up", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 3, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(12, 0), mode: "advance-booking" },
-  { patientKey: "pd_t1", department: "Pediatrics", symptoms: "Advance pediatric follow-up", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 2, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(13, 0), mode: "advance-booking" },
-  { patientKey: "em_t1", department: "Emergency", symptoms: "Advance emergency recheck", status: "queued", queueStatus: "waiting", priority: 2, token: 11, painScale: 4, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(14, 0), mode: "advance-booking" },
+  { patientKey: "gm_adv", department: "General Medicine", symptoms: "Advance follow-up booking", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 2, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(10, 0), mode: "advance-booking" },
+  { patientKey: "cd_adv", department: "Cardiology", symptoms: "Advance cardiology review", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 3, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(11, 0), mode: "advance-booking" },
+  { patientKey: "or_adv", department: "Orthopedics", symptoms: "Advance ortho follow-up", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 3, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(12, 0), mode: "advance-booking" },
+  { patientKey: "pd_adv", department: "Pediatrics", symptoms: "Advance pediatric follow-up", status: "queued", queueStatus: "waiting", priority: 3, token: 11, painScale: 2, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(13, 0), mode: "advance-booking" },
+  { patientKey: "em_adv", department: "Emergency", symptoms: "Advance emergency recheck", status: "queued", queueStatus: "waiting", priority: 2, token: 11, painScale: 4, createdAt: hoursAgo(0.3), preferredSlot: getTomorrowAt(14, 0), mode: "advance-booking" },
 ];
 
 async function createPatient(client, p) {
@@ -230,7 +237,7 @@ async function run() {
 
     await client.query("COMMIT");
     console.log("✅ Showcase cases seeded successfully.");
-    console.log("Patients: 20");
+    console.log("Patients: 25");
     console.log("Visits: 25");
     console.log("Per department: normal + quick-intake + staff-assisted + completed + future-date advance booking");
   } catch (error) {
