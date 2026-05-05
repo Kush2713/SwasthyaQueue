@@ -57,6 +57,15 @@ function datePartsToKey(parts) {
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
+function isFutureOperationalDate(isoDateTime, timeZone) {
+  if (!isoDateTime) return false;
+  const slot = new Date(isoDateTime);
+  if (Number.isNaN(slot.getTime())) return false;
+  const slotKey = datePartsToKey(getTimeZoneDateParts(slot, timeZone));
+  const todayKey = datePartsToKey(getTimeZoneDateParts(new Date(), timeZone));
+  return slotKey > todayKey;
+}
+
 function mapAppointmentRow(row) {
   return {
     appointmentId: row.appointment_id,
@@ -653,26 +662,30 @@ async function createAppointment(req, res) {
     );
 
     const appointment = appointmentResult.rows[0];
-    const queue = await createQueueEntry(client, {
-      appointmentId: appointment.appointment_id,
-      patientId: req.auth.patient_id,
-      departmentId: department_id,
-      priorityLevel,
-    });
+    let queue = null;
+    const shouldQueueToday = !isFutureOperationalDate(normalizedPreferredSlot, HOSPITAL_TIMEZONE);
+    if (shouldQueueToday) {
+      queue = await createQueueEntry(client, {
+        appointmentId: appointment.appointment_id,
+        patientId: req.auth.patient_id,
+        departmentId: department_id,
+        priorityLevel,
+      });
 
-    await client.query(
-      `
-        UPDATE appointments
-        SET status = 'queued',
-            queue_id = $2,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = $1
-      `,
-      [appointment.appointment_id, queue.queue_id]
-    );
+      await client.query(
+        `
+          UPDATE appointments
+          SET status = 'queued',
+              queue_id = $2,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE appointment_id = $1
+        `,
+        [appointment.appointment_id, queue.queue_id]
+      );
+    }
 
     const details = await getAppointmentDetails(client, appointment.appointment_id);
-    const positionInfo = await getQueuePositionInfo(client, queue.queue_id, department_id);
+    const positionInfo = queue ? await getQueuePositionInfo(client, queue.queue_id, department_id) : { position: null, estimatedWaitTime: null };
 
     await logWorkflowEvent(client, {
       actor,
@@ -681,13 +694,14 @@ async function createAppointment(req, res) {
       entityId: appointment.appointment_id,
       patientId: req.auth.patient_id,
       appointmentId: appointment.appointment_id,
-      queueId: queue.queue_id,
+      queueId: queue?.queue_id || null,
       details: {
         departmentId: department_id,
         symptoms: symptoms.trim(),
         preferredSlot: normalizedPreferredSlot,
         priorityLevel,
         prioritySuggestion,
+        queueDeferredToVisitDate: !shouldQueueToday,
       },
     });
 
@@ -700,6 +714,7 @@ async function createAppointment(req, res) {
         position: positionInfo.position,
         estimatedWait: positionInfo.estimatedWaitTime,
         prioritySuggestion,
+        queuedToday: Boolean(queue),
       },
     });
   } catch (err) {

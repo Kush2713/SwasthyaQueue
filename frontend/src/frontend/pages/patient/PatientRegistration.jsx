@@ -107,7 +107,33 @@ function getCurrentMinutes() {
   return now.getHours() * 60 + now.getMinutes();
 }
 
+function getClosestSlotForNow(slots = []) {
+  if (!slots.length) return "";
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const slotMinutes = slots
+    .map((value) => {
+      const [h, m] = String(value).split(":").map((part) => Number(part));
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+      return { value, minutes: h * 60 + m };
+    })
+    .filter(Boolean);
+  if (!slotMinutes.length) return "";
+  let best = slotMinutes[0];
+  let bestDistance = Math.abs(best.minutes - currentMinutes);
+  for (const item of slotMinutes) {
+    const distance = Math.abs(item.minutes - currentMinutes);
+    if (distance < bestDistance) {
+      best = item;
+      bestDistance = distance;
+    }
+  }
+  return best.value;
+}
+
 export default function PatientRegistration({ onBack, user, onRegistered }) {
+  const defaultPreferredDate = getTodayDateValue();
+  const defaultPreferredTime = getClosestSlotForNow(slotTimeOptions);
   const initialForm = {
     name: user?.name || "",
     mobile: user?.mobile || "",
@@ -120,8 +146,8 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     symptoms: [],
     otherSymptoms: "",
     painScale: 0,
-    preferredDate: "",
-    preferredTime: "",
+    preferredDate: defaultPreferredDate,
+    preferredTime: defaultPreferredTime,
     department: "Auto-detect from symptoms",
   };
 
@@ -286,19 +312,20 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
         : new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
       const payload = {
-        token: appointment?.token,
+        token: appointment?.token ?? "Scheduled",
         queueId: appointment?.queueId,
         appointmentId: appointment?.appointmentId,
         patientId: user?.patientId,
         departmentId,
-        estimatedWait: appointment?.estimatedWait ?? 0,
-        position: appointment?.position || 1,
+        estimatedWait: appointment?.estimatedWait ?? "-",
+        position: appointment?.position || "-",
         registeredAt,
         preferredSlot: appointment?.preferredSlot,
         department,
         dept: department,
         priority: risk.priority,
         priorityLevel: appointment?.priorityLevel,
+        queuedToday: appointment?.queuedToday !== false,
         riskScore: risk.score,
         patientName: form.name,
         symptoms: finalSymptoms,
@@ -572,12 +599,12 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
             <FormCard title="Registration Successful" subtitle="Token generated">
               <div style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden" }}>
                 <div style={{ background: COLORS.navy, color: "#fff", padding: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{success.department}</strong><span style={{ background: COLORS.saffron, color: "#4A2500", borderRadius: 999, padding: "4px 10px", fontWeight: 800 }}>#{success.token}</span>
+                  <strong>{success.department}</strong><span style={{ background: COLORS.saffron, color: "#4A2500", borderRadius: 999, padding: "4px 10px", fontWeight: 800 }}>{typeof success.token === "number" ? `#${success.token}` : success.token}</span>
                 </div>
                 <div style={{ padding: 12 }}>
                   <div style={{ fontSize: 22, fontWeight: 800 }}>{form.name}</div>
                   <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(2, minmax(120px,1fr))", marginTop: 12, marginBottom: 10 }}>
-                    <InfoCell label="Estimated Wait" value={`${success.estimatedWait} min`} />
+                    <InfoCell label="Estimated Wait" value={typeof success.estimatedWait === "number" ? `${success.estimatedWait} min` : "Will be available on visit date"} />
                     <InfoCell label="Position in Queue" value={success.position} />
                     <InfoCell label="Department" value={success.department} />
                     <InfoCell label="Registered At" value={success.registeredAt} />

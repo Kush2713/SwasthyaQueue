@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TIMING } from "../../lib/timing";
+import { subscribeQueueUpdates } from "../../lib/realtimeSync";
 
 const COLORS = {
   navyDark: "#002060",
@@ -91,6 +92,12 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
     }, TIMING.patientPollMs);
     return () => clearInterval(refreshId);
   }, [screenState, loadDashboardData]);
+
+  useEffect(() => {
+    return subscribeQueueUpdates(() => {
+      loadDashboardData();
+    });
+  }, [loadDashboardData]);
 
   useEffect(() => {
     if (screenState !== "ready") return;

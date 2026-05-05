@@ -4,10 +4,10 @@ function parseMs(value, fallback) {
 }
 
 export const TIMING = {
-  staffPollMs: parseMs(process.env.NEXT_PUBLIC_STAFF_POLL_MS, 10000),
-  receptionPollMs: parseMs(process.env.NEXT_PUBLIC_RECEPTION_POLL_MS, 20000),
-  patientPollMs: parseMs(process.env.NEXT_PUBLIC_PATIENT_POLL_MS, 30000),
-  displayPollMs: parseMs(process.env.NEXT_PUBLIC_DISPLAY_POLL_MS, 10000),
+  staffPollMs: parseMs(process.env.NEXT_PUBLIC_STAFF_POLL_MS, 5000),
+  receptionPollMs: parseMs(process.env.NEXT_PUBLIC_RECEPTION_POLL_MS, 5000),
+  patientPollMs: parseMs(process.env.NEXT_PUBLIC_PATIENT_POLL_MS, 10000),
+  displayPollMs: parseMs(process.env.NEXT_PUBLIC_DISPLAY_POLL_MS, 5000),
   patientNoticeMs: parseMs(process.env.NEXT_PUBLIC_PATIENT_NOTICE_MS, 40000),
 };
 

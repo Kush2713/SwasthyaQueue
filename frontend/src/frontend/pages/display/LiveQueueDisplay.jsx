@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TIMING } from "../../lib/timing";
+import { subscribeQueueUpdates } from "../../lib/realtimeSync";
 
 const COLORS = {
   pageBg: "#EEF2F7",
@@ -181,6 +182,12 @@ export default function LiveQueueDisplay() {
       window.removeEventListener("focus", onFocus);
     };
   }, [screenState, loadDisplayData]);
+
+  useEffect(() => {
+    return subscribeQueueUpdates(() => {
+      loadDisplayData();
+    });
+  }, [loadDisplayData]);
 
   if (screenState === "loading") {
     return <DisplayShell clock={clock} livePulse={livePulse}><DisplayStateCard title="Loading live queue" description="Fetching department queue data from the backend." /></DisplayShell>;

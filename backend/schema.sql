@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS staff_accounts (
   staff_id SERIAL PRIMARY KEY,
   user_id VARCHAR(80) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor', 'admin')),
+  role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor')),
   name VARCHAR(120) NOT NULL,
   designation VARCHAR(120),
   active BOOLEAN NOT NULL DEFAULT TRUE,

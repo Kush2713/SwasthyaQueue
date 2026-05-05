@@ -42,7 +42,7 @@ async function ensureSchema() {
       staff_id SERIAL PRIMARY KEY,
       user_id VARCHAR(80) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
-      role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor', 'admin')),
+      role VARCHAR(30) NOT NULL CHECK (role IN ('receptionist', 'nurse', 'doctor')),
       name VARCHAR(120) NOT NULL,
       designation VARCHAR(120),
       active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -187,16 +187,11 @@ async function ensureSchema() {
     VALUES
       ('receptionist01', $1, 'receptionist', 'Anita Reddy', 'Receptionist', TRUE),
       ('nurse01', $2, 'nurse', 'Sujatha Rao', 'Nurse | General Medicine', TRUE),
-      ('nurse_cardio01', $3, 'nurse', 'Lakshmi Iyer', 'Nurse | Cardiology', TRUE),
-      ('nurse_ortho01', $4, 'nurse', 'Ravi Kumar', 'Nurse | Orthopedics', TRUE),
-      ('nurse_pedia01', $5, 'nurse', 'Meera Nair', 'Nurse | Pediatrics', TRUE),
-      ('nurse_emg01', $6, 'nurse', 'Arjun Verma', 'Nurse | Emergency', TRUE),
-      ('doctor01', $7, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
-      ('doctor_cardio01', $8, 'doctor', 'Dr. Priya Menon', 'Doctor | Cardiology', TRUE),
-      ('doctor_ortho01', $9, 'doctor', 'Dr. Vikram Singh', 'Doctor | Orthopedics', TRUE),
-      ('doctor_pedia01', $10, 'doctor', 'Dr. Ananya Rao', 'Doctor | Pediatrics', TRUE),
-      ('doctor_emg01', $11, 'doctor', 'Dr. Farhan Ali', 'Doctor | Emergency', TRUE),
-      ('admin01', $12, 'admin', 'System Admin', 'Platform Admin', TRUE)
+      ('doctor01', $3, 'doctor', 'Dr. S. Mehta', 'Doctor | General Medicine', TRUE),
+      ('doctor_cardio01', $4, 'doctor', 'Dr. Priya Menon', 'Doctor | Cardiology', TRUE),
+      ('doctor_ortho01', $5, 'doctor', 'Dr. Vikram Singh', 'Doctor | Orthopedics', TRUE),
+      ('doctor_pedia01', $6, 'doctor', 'Dr. Ananya Rao', 'Doctor | Pediatrics', TRUE),
+      ('doctor_emg01', $7, 'doctor', 'Dr. Farhan Ali', 'Doctor | Emergency', TRUE)
     ON CONFLICT (user_id) DO UPDATE
     SET password_hash = EXCLUDED.password_hash,
         role = EXCLUDED.role,
@@ -207,17 +202,20 @@ async function ensureSchema() {
   `, [
     hashStaffPassword("sqrecp123"),
     hashStaffPassword("sqnurse123"),
-    hashStaffPassword("sqnurse123"),
-    hashStaffPassword("sqnurse123"),
-    hashStaffPassword("sqnurse123"),
-    hashStaffPassword("sqnurse123"),
     hashStaffPassword("sqdoc123"),
     hashStaffPassword("sqdoc123"),
     hashStaffPassword("sqdoc123"),
     hashStaffPassword("sqdoc123"),
     hashStaffPassword("sqdoc123"),
-    hashStaffPassword("admin123"),
   ]);
+
+  await pool.query(`
+    UPDATE staff_accounts
+    SET active = FALSE,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE role = 'nurse'
+      AND user_id <> 'nurse01'
+  `);
 
   await pool.query(`
     INSERT INTO staff_department_assignments (staff_id, department_id, is_primary, active)
@@ -229,15 +227,29 @@ async function ensureSchema() {
       OR (s.user_id = 'doctor_ortho01' AND d.name = 'Orthopedics')
       OR (s.user_id = 'doctor_pedia01' AND d.name = 'Pediatrics')
       OR (s.user_id = 'doctor_emg01' AND d.name = 'Emergency')
-      OR (s.user_id = 'nurse01' AND d.name = 'General Medicine')
-      OR (s.user_id = 'nurse_cardio01' AND d.name = 'Cardiology')
-      OR (s.user_id = 'nurse_ortho01' AND d.name = 'Orthopedics')
-      OR (s.user_id = 'nurse_pedia01' AND d.name = 'Pediatrics')
-      OR (s.user_id = 'nurse_emg01' AND d.name = 'Emergency')
-      OR (s.user_id = 'admin01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
+      OR (s.user_id = 'nurse01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
       OR (s.user_id = 'receptionist01' AND d.name IN ('General Medicine', 'Cardiology', 'Orthopedics', 'Pediatrics', 'Emergency'))
     ON CONFLICT (staff_id, department_id) DO UPDATE
     SET active = TRUE
+  `);
+
+  await pool.query(`
+    UPDATE staff_accounts
+    SET active = FALSE,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE role = 'admin'
+  `);
+
+  await pool.query(`
+    UPDATE staff_department_assignments
+    SET active = FALSE,
+        is_primary = FALSE
+    WHERE staff_id IN (
+      SELECT staff_id
+      FROM staff_accounts
+      WHERE role = 'nurse'
+        AND user_id <> 'nurse01'
+    )
   `);
   }
 

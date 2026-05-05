@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TIMING } from "../../lib/timing";
+import { subscribeQueueUpdates } from "../../lib/realtimeSync";
 
 const COLORS = {
   navyDark: "#002060",
@@ -83,6 +84,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupMatches, setLookupMatches] = useState([]);
   const [lookupSearched, setLookupSearched] = useState(false);
+  const [queueDate, setQueueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeDepartment, setActiveDepartment] = useState("All");
   const [urgentForm, setUrgentForm] = useState({ queueId: null, reason: "" });
   const [assistedForm, setAssistedForm] = useState({
@@ -121,7 +123,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
       const queueByDepartment = await Promise.all(
         departmentRows.map(async (department) => ({
           department,
-          queue: await getQueueByDepartment(department.department_id),
+          queue: await getQueueByDepartment(department.department_id, queueDate),
         }))
       );
 
@@ -173,7 +175,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
       setLoadError(err.message || "Unable to load the receptionist console right now.");
       setScreenState("error");
     }
-  }, [allowedDepartmentIds]);
+  }, [allowedDepartmentIds, queueDate]);
 
   useEffect(() => {
     setClock(clockText());
@@ -200,6 +202,12 @@ export default function ReceptionDashboard({ user, onLogout }) {
       window.removeEventListener("focus", onFocus);
     };
   }, [screenState, loadReceptionData]);
+
+  useEffect(() => {
+    return subscribeQueueUpdates(() => {
+      loadReceptionData();
+    });
+  }, [loadReceptionData]);
 
   const receptionistStats = useMemo(() => {
     const waiting = queueRows.filter((row) => row.rawStatus === "waiting").length;
@@ -292,7 +300,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
   const callNextForDepartment = async (departmentId) => {
     try {
       const { callNextPatient } = await import("../../lib/api");
-      await callNextPatient({ department_id: departmentId });
+      await callNextPatient({ department_id: departmentId, date: queueDate });
       await loadReceptionData();
     } catch (err) {
       setLoadError(err.message || "Unable to call the next patient right now.");
@@ -370,6 +378,9 @@ export default function ReceptionDashboard({ user, onLogout }) {
         success: `Case created with token #${response.case.currentVisit.token} in ${response.case.currentVisit.department}.`,
       });
       await loadReceptionData();
+      setTimeout(() => {
+        setActiveOverlay("");
+      }, 900);
     } catch (err) {
       setAssistedCaseState({
         loading: false,
@@ -480,18 +491,20 @@ export default function ReceptionDashboard({ user, onLogout }) {
                       <div style={{ fontWeight: 800, fontSize: 18 }}>{lookupResult.name}</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>{lookupResult.tokenLabel || `Token #${lookupResult.token}`} | Patient ID {lookupResult.patientId}</div>
                     </div>
-                    <PriorityPill priority={lookupResult.priority} />
+                    {lookupResult.hasActiveQueue ? <PriorityPill priority={lookupResult.priority} /> : null}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(160px, 1fr))", gap: 8, marginTop: 10 }}>
-                    <InfoBox label="Department" value={lookupResult.department} />
+                    <InfoBox label="Department" value={lookupResult.department || "-"} />
                     <InfoBox label="Status" value={lookupResult.status} />
                     <InfoBox label="Patients Ahead" value={lookupResult.peopleAhead} />
-                    <InfoBox label="Estimated Wait" value={`${lookupResult.waitMins} min`} />
+                    <InfoBox label="Estimated Wait" value={lookupResult.hasActiveQueue ? `${lookupResult.waitMins} min` : "-"} />
                     <InfoBox label="Mobile" value={formatIndianMobile(lookupResult.mobile)} />
                     <InfoBox label="Preferred Slot" value={lookupResult.preferredSlot} />
                   </div>
                   <div style={{ marginTop: 10, border: "1px solid #BFDBFE", background: "#EFF6FF", color: "#1D4ED8", borderRadius: 8, padding: "10px 12px", fontSize: 13 }}>
-                    Front desk answer: {lookupResult.tokenLabel || `Token #${lookupResult.token}`} in {lookupResult.department} currently has about {lookupResult.waitMins} minute(s) to go.
+                    {lookupResult.hasActiveQueue
+                      ? `Front desk answer: ${lookupResult.tokenLabel || `Token #${lookupResult.token}`} in ${lookupResult.department} currently has about ${lookupResult.waitMins} minute(s) to go.`
+                      : "Front desk answer: This patient has no active queue right now. You can create a fresh visit from reception."}
                   </div>
                   {lookupResult.rawStatus === "waiting" ? (
                     <div style={{ marginTop: 10 }}>
@@ -555,6 +568,12 @@ export default function ReceptionDashboard({ user, onLogout }) {
 
         <section style={{ background: "#fff", border: "1px solid #CBD5E1", borderRadius: 12, padding: 14 }}>
           <SectionTitle title="Live Queue Table" subtitle={activeDepartment === "All" ? "Current visible queue for receptionist assistance" : `${activeDepartment} department queue`} />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#334155", fontWeight: 700 }}>
+              Queue Date
+              <input type="date" value={queueDate} onChange={(event) => setQueueDate(event.target.value)} style={{ border: "1px solid #CBD5E1", borderRadius: 8, padding: "6px 8px", fontSize: 12 }} />
+            </label>
+          </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             <button type="button" onClick={() => setActiveDepartment("All")} style={{ ...chipStyle, ...(activeDepartment === "All" ? activeChipStyle : {}) }}>All Departments</button>
             {departments.map((department) => (
@@ -891,7 +910,7 @@ function PriorityPill({ priority }) {
     : priority === "high"
       ? { bg: "#FEF3C7", color: "#B45309", label: "High" }
       : { bg: "#DCFCE7", color: "#166534", label: "Normal" };
-  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "4px 9px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>;
+  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>{tone.label}</span>;
 }
 
 function MiniStat({ title, value }) {

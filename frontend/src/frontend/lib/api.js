@@ -1,3 +1,5 @@
+import { publishQueueUpdate } from "./realtimeSync";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
 const AUTH_SESSION_KEY = "swasthyaqueue_session";
 
@@ -203,6 +205,9 @@ export function callNextPatient(payload) {
   return request("/api/queue/next", {
     method: "POST",
     body: JSON.stringify(payload),
+  }).then((response) => {
+    publishQueueUpdate();
+    return response;
   });
 }
 
@@ -248,8 +253,9 @@ export function markReadyForDoctor(queueId, payload) {
   });
 }
 
-export function getQueueByDepartment(departmentId) {
-  return request(`/api/queue/${departmentId}`);
+export function getQueueByDepartment(departmentId, date) {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  return request(`/api/queue/${departmentId}${query}`);
 }
 
 export function getQueuePosition(patientId, departmentId) {

@@ -192,17 +192,12 @@ Shared passwords:
 - Receptionist: `sqrecp123`
 - All nurses: `sqnurse123`
 - All doctors: `sqdoc123`
-- Admin: `admin123`
 
 Reception:
 - `receptionist01` -> Anita Reddy
 
 Nurses:
-- `nurse01` -> Sujatha Rao (General Medicine)
-- `nurse_cardio01` -> Lakshmi Iyer (Cardiology)
-- `nurse_ortho01` -> Ravi Kumar (Orthopedics)
-- `nurse_pedia01` -> Meera Nair (Pediatrics)
-- `nurse_emg01` -> Arjun Verma (Emergency)
+- `nurse01` -> Sujatha Rao (All Departments)
 
 Doctors:
 - `doctor01` -> Dr. S. Mehta (General Medicine)
@@ -210,9 +205,6 @@ Doctors:
 - `doctor_ortho01` -> Dr. Vikram Singh (Orthopedics)
 - `doctor_pedia01` -> Dr. Ananya Rao (Pediatrics)
 - `doctor_emg01` -> Dr. Farhan Ali (Emergency)
-
-Admin:
-- `admin01` -> System Admin
 
 ## API Groups
 
@@ -229,9 +221,6 @@ Admin:
 - `POST /api/auth/patient/verify-otp`
 - `GET /api/auth/me`
 - `POST /api/auth/staff/patient-account`
-- `GET /api/auth/admin/staff`
-- `PUT /api/auth/admin/staff/:staff_id/assignments`
-- `PUT /api/auth/admin/staff/:staff_id/password`
 
 ### Patients
 
@@ -297,12 +286,6 @@ Admin:
 - prescription / advice
 - doctor notes
 - complete visit
-
-### Admin
-
-- list staff accounts with department assignments
-- assign active departments and set primary department
-- reset staff passwords
 
 ## Practical Notes
 

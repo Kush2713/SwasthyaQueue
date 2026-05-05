@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TIMING } from "../../lib/timing";
+import { subscribeQueueUpdates } from "../../lib/realtimeSync";
 
 const COLORS = {
   navyDark: "#002060",
@@ -9,6 +10,14 @@ const COLORS = {
   green: "#138808",
   pageBg: "#EEF2F7",
   skyText: "#A8C8FF",
+};
+
+const DEPARTMENT_COLORS = {
+  "General Medicine": { bg: "#DBEAFE", text: "#1D4ED8", border: "#93C5FD" },
+  Cardiology: { bg: "#FEE2E2", text: "#B91C1C", border: "#FCA5A5" },
+  Orthopedics: { bg: "#FFEDD5", text: "#C2410C", border: "#FDBA74" },
+  Pediatrics: { bg: "#DCFCE7", text: "#166534", border: "#86EFAC" },
+  Emergency: { bg: "#FEE2E2", text: "#991B1B", border: "#EF4444" },
 };
 
 function clockText() {
@@ -42,6 +51,10 @@ function hasFuturePreferredSlot(value) {
 
 function isEmergencyDepartment(name = "") {
   return String(name).toLowerCase().includes("emerg");
+}
+
+function getDepartmentTone(departmentName = "") {
+  return DEPARTMENT_COLORS[departmentName] || { bg: "#E2E8F0", text: "#334155", border: "#CBD5E1" };
 }
 
 function buildClinicalFlags({ temperatureF, pulseRate, spo2, painScale }) {
@@ -149,6 +162,7 @@ export default function StaffDashboard({ user, onLogout }) {
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupSearched, setLookupSearched] = useState(false);
+  const [queueDate, setQueueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [toast, setToast] = useState("");
   const [screenState, setScreenState] = useState("loading");
   const [loadError, setLoadError] = useState("");
@@ -174,7 +188,7 @@ export default function StaffDashboard({ user, onLogout }) {
       const queueLists = await Promise.all(
         departmentRows.map(async (department) => ({
           department,
-          queue: await getQueueByDepartment(department.department_id),
+          queue: await getQueueByDepartment(department.department_id, queueDate),
         }))
       );
 
@@ -237,7 +251,7 @@ export default function StaffDashboard({ user, onLogout }) {
       setLoadError(error.message || "Unable to load staff queue details right now.");
       setScreenState("error");
     }
-  }, [allowedDepartmentIds]);
+  }, [allowedDepartmentIds, queueDate]);
 
   useEffect(() => {
     setClock(clockText());
@@ -277,6 +291,12 @@ export default function StaffDashboard({ user, onLogout }) {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [screenState, loadDashboardData]);
+
+  useEffect(() => {
+    return subscribeQueueUpdates(() => {
+      loadDashboardData();
+    });
+  }, [loadDashboardData]);
 
   const kpis = useMemo(() => {
     const waiting = patients.filter((patient) => patient.rawStatus === "waiting").length;
@@ -683,6 +703,12 @@ export default function StaffDashboard({ user, onLogout }) {
       <GovHeader name={user?.name || "Staff"} clock={clock} role={user?.role} />
 
       <main style={{ maxWidth: 880, margin: "0 auto", padding: "14px 12px 24px" }}>
+        <section style={{ marginBottom: 8, display: "flex", justifyContent: "flex-end" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#334155", fontWeight: 700 }}>
+            Queue Date
+            <input type="date" value={queueDate} onChange={(event) => setQueueDate(event.target.value)} style={{ border: "1px solid #CBD5E1", borderRadius: 8, padding: "6px 8px", fontSize: 12, background: "#fff" }} />
+          </label>
+        </section>
         <section style={{ background: COLORS.navy, color: "#fff", borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
@@ -865,7 +891,8 @@ export default function StaffDashboard({ user, onLogout }) {
                                 <div>
                                   <div style={{ fontWeight: 800, color: "#0F172A" }}>#{patient.token} | {patient.name}</div>
                                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: "#64748B", marginTop: 2 }}>
-                                    <span>{patient.department} | wait {patient.waitMins} min</span>
+                                    <DepartmentPill department={patient.department} />
+                                    <span>wait {patient.waitMins} min</span>
                                     {isEmergencyDepartment(patient.department) ? <EmergencyPill /> : null}
                                   </div>
                                   {hasFuturePreferredSlot(patient.preferredSlot) ? <div style={{ marginTop: 4, fontSize: 11, color: "#1D4ED8", fontWeight: 700 }}>Advance Booking</div> : null}
@@ -904,7 +931,7 @@ export default function StaffDashboard({ user, onLogout }) {
                                 <div>
                                   <div style={{ fontWeight: 800, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
                                   <div style={{ marginTop: 2, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: "#64748B" }}>
-                                    <span>{patient.department}</span>
+                                    <DepartmentPill department={patient.department} />
                                     {isEmergencyDepartment(patient.department) ? <EmergencyPill /> : null}
                                   </div>
                                   {hasFuturePreferredSlot(patient.preferredSlot) ? <div style={{ marginTop: 4, fontSize: 11, color: "#1D4ED8", fontWeight: 700 }}>Advance Booking</div> : null}
@@ -945,8 +972,9 @@ export default function StaffDashboard({ user, onLogout }) {
                                 <strong style={{ color: COLORS.navy }}>#{patient.token} | {patient.name}</strong>
                                 <AppointmentStatusPill status={patient.appointmentStatus} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748B" }}>
-                                {patient.department} | Assessed {new Date(patient.assessedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}
+                              <div style={{ fontSize: 12, color: "#64748B", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <DepartmentPill department={patient.department} />
+                                <span>Assessed {new Date(patient.assessedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}</span>
                               </div>
                             </button>
                           ))}
@@ -970,8 +998,9 @@ export default function StaffDashboard({ user, onLogout }) {
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
                               <div>
                                 <div style={{ fontWeight: 800, fontSize: 20, color: COLORS.navy }}>#{patient.token} | {patient.name}</div>
-                                <div style={{ marginTop: 3, fontSize: 13, color: "#64748B" }}>
-                                  {patient.department} | {patient.rawStatus === "in-progress" ? "in consultation" : "waiting"} | {patient.mobile || "No phone"}
+                                <div style={{ marginTop: 3, fontSize: 13, color: "#64748B", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                  <DepartmentPill department={patient.department} />
+                                  <span>{patient.rawStatus === "in-progress" ? "in consultation" : "waiting"} | {patient.mobile || "No phone"}</span>
                                 </div>
                                 {hasFuturePreferredSlot(patient.preferredSlot) ? <div style={{ marginTop: 4, fontSize: 12, color: "#1D4ED8", fontWeight: 700 }}>Advance Booking</div> : null}
                               </div>
@@ -1354,6 +1383,14 @@ function AppointmentStatusPill({ status }) {
       ? { bg: "#DBEAFE", color: "#1D4ED8", label: "In Room" }
       : { bg: "#E2E8F0", color: "#475569", label: "Queued" };
   return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>;
+}
+function DepartmentPill({ department }) {
+  const tone = getDepartmentTone(department);
+  return (
+    <span style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}`, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>
+      {department}
+    </span>
+  );
 }
 function QueueManagerRow({ patient, userRole, onOpenCase, onCall, onComplete }) { const emergency = isEmergencyDepartment(patient.department); const left = emergency ? "#B91C1C" : patient.priority === "critical" ? "#DC2626" : patient.priority === "high" ? "#D97706" : "transparent"; const rowBg = patient.status === "in-consultation" ? "#ECFDF5" : patient.status === "completed" ? "#F1F5F9" : emergency ? "#FFF7F7" : "#FFFFFF"; return <div style={{ display: "grid", gridTemplateColumns: "72px 1.8fr 1.2fr 1fr 1fr 1fr", gap: 8, alignItems: "center", borderBottom: "1px solid #E2E8F0", borderLeft: `4px solid ${left}`, background: rowBg, padding: "9px 10px", fontSize: 12 }}><div style={{ fontFamily: "monospace", fontWeight: 800 }}>#{patient.token}</div><div><div style={{ fontWeight: 700 }}>{patient.name}</div><div style={{ color: "#64748B" }}>Queue #{patient.queueId}</div></div><div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><span>{patient.department}</span>{emergency ? <EmergencyPill /> : null}</div><div><PriorityPill priority={patient.priority} /></div><div>{patient.waitMins} min</div><div style={{ display: "grid", gap: 6 }}>{patient.rawStatus === "waiting" ? (userRole === "nurse" ? <span style={{ color: "#64748B", fontWeight: 700 }}>Reception Calls</span> : <button type="button" onClick={onCall} style={{ ...btnPrimary, padding: "6px 9px", fontSize: 12 }}>Call Next</button>) : patient.rawStatus === "in-progress" ? <button type="button" onClick={onComplete} style={{ ...btnPrimary, background: COLORS.green, padding: "6px 9px", fontSize: 12 }}>Complete</button> : <span style={{ color: "#64748B", fontWeight: 700 }}>Done</span>}<button type="button" onClick={onOpenCase} style={{ ...btnGhost, padding: "6px 9px", fontSize: 12 }}>Open Case</button></div></div>; }
 function InfoBox({ label, value }) { return <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, background: "#F8FAFC", padding: "8px 9px" }}><div style={{ fontSize: 11, color: "#64748B" }}>{label}</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginTop: 2 }}>{value}</div></div>; }

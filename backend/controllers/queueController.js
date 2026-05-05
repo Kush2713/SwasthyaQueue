@@ -15,6 +15,7 @@ const {
   getMissingRequiredFields,
   formatMissingFieldNames,
 } = require("../utils/clinicalProfiles");
+const HOSPITAL_TIMEZONE = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
 
 async function getQueueDepartmentId(queueId) {
   const result = await pool.query(
@@ -60,6 +61,25 @@ function getTemperatureF(reqBody) {
   if (temp === null || Number.isNaN(temp)) return temp;
   if (temp <= 45) return toFahrenheitFromCelsius(temp);
   return temp;
+}
+
+function getHospitalTodayDateKey() {
+  const timeZone = process.env.HOSPITAL_TIMEZONE || "Asia/Kolkata";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const bag = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${bag.year}-${bag.month}-${bag.day}`;
+}
+
+function resolveQueueDateFilter(value) {
+  const source = String(value || "").trim();
+  if (!source) return getHospitalTodayDateKey();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(source)) return getHospitalTodayDateKey();
+  return source;
 }
 
 function validateTriageVitals({ temperatureF, pulseRate, spo2, weightKg, bloodPressure }) {
@@ -163,6 +183,7 @@ const addToQueue = async (req, res) => {
 const getQueueByDepartment = async (req, res) => {
   try {
     const departmentId = Number(req.params.department_id);
+    const queueDate = resolveQueueDateFilter(req.query?.date);
     if (!Number.isFinite(departmentId)) {
       return res.status(400).json({ error: "Invalid department id." });
     }
@@ -216,9 +237,10 @@ const getQueueByDepartment = async (req, res) => {
         LEFT JOIN appointments a ON q.appointment_id = a.appointment_id
         WHERE q.department_id = $1
           AND q.status IN ('waiting', 'in-progress')
+          AND (COALESCE(a.preferred_slot, q.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $2::date
         ORDER BY priority_level ASC, token_number ASC
       `,
-      [departmentId]
+      [departmentId, queueDate]
     );
 
     const enhancedQueue = await Promise.all(result.rows.map(async (patient, index) => {
@@ -255,6 +277,7 @@ const getQueueByDepartment = async (req, res) => {
 const checkTurn = async (req, res) => {
   try {
     const { patient_id, department_id } = req.body;
+    const queueDate = resolveQueueDateFilter(req.body?.date || req.query?.date);
 
     if (!patient_id || !department_id) {
       return res.status(400).json({ error: "Invalid input" });
@@ -300,9 +323,10 @@ const checkTurn = async (req, res) => {
         LEFT JOIN appointments a ON q.appointment_id = a.appointment_id
         WHERE q.department_id = $1
           AND q.status IN ('waiting', 'in-progress')
+          AND (COALESCE(a.preferred_slot, q.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $2::date
         ORDER BY priority_level ASC, token_number ASC
       `,
-      [department_id]
+      [department_id, queueDate]
     );
 
     const index = result.rows.findIndex((p) => p.patient_id === patient_id);
@@ -328,6 +352,7 @@ const checkTurn = async (req, res) => {
 const callNextPatient = async (req, res) => {
   try {
     const { department_id } = req.body;
+    const queueDate = resolveQueueDateFilter(req.body?.date || req.query?.date);
     const departmentId = Number(department_id);
     const actor = getActorFromRequest(req, { role: "receptionist", name: "Front Desk" });
     if (!Number.isFinite(departmentId)) {
@@ -341,13 +366,15 @@ const callNextPatient = async (req, res) => {
       `
         SELECT *
         FROM queue
+        LEFT JOIN appointments a ON a.appointment_id = queue.appointment_id
         WHERE department_id = $1
           AND status = 'waiting'
           AND COALESCE(urgent_review_requested, FALSE) = FALSE
+          AND (COALESCE(a.preferred_slot, queue.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $2::date
         ORDER BY priority_level ASC, token_number ASC
         LIMIT 1
       `,
-      [departmentId]
+      [departmentId, queueDate]
     );
 
     if (result.rows.length === 0) {
@@ -671,6 +698,7 @@ const approvePriorityOverride = async (req, res) => {
 
 const getDisplayBoard = async (_req, res) => {
   try {
+    const queueDate = getHospitalTodayDateKey();
     const departmentResult = await pool.query(
       `
         SELECT department_id, name, avg_consult_time
@@ -691,9 +719,12 @@ const getDisplayBoard = async (_req, res) => {
           p.name AS patient_name
         FROM queue q
         JOIN patients p ON p.patient_id = q.patient_id
+        LEFT JOIN appointments a ON a.appointment_id = q.appointment_id
         WHERE q.status IN ('waiting', 'in-progress')
+          AND (COALESCE(a.preferred_slot, q.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $1::date
         ORDER BY q.department_id ASC, q.priority_level ASC, q.token_number ASC
-      `
+      `,
+      [queueDate]
     );
 
     const queueByDepartment = new Map();
