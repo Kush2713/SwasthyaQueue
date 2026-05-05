@@ -1387,17 +1387,17 @@ function FlagPill({ tone, label }) {
   const palette = tone === "critical"
     ? { bg: "#FEE2E2", color: "#B91C1C" }
     : { bg: "#FEF3C7", color: "#92400E" };
-  return <span style={{ background: palette.bg, color: palette.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 800 }}>{label}</span>;
+  return <span style={{ background: palette.bg, color: palette.color, borderRadius: 6, minWidth: 58, height: 30, padding: "0 10px", fontSize: 11, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>{label}</span>;
 }
-function ReviewFlagPill() { return <span style={{ background: "#FEF3C7", color: "#B45309", borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>Needs Review</span>; }
-function EmergencyPill() { return <span style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 999, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>Emergency</span>; }
+function ReviewFlagPill() { return <span style={{ background: "#FEF3C7", color: "#B45309", borderRadius: 6, minWidth: 58, height: 30, padding: "0 10px", fontSize: 11, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>Needs Review</span>; }
+function EmergencyPill() { return <span style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 6, minWidth: 58, height: 30, padding: "0 10px", fontSize: 11, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>Emergency</span>; }
 function AppointmentStatusPill({ status }) {
   const tone = status === "ready-for-doctor"
     ? { bg: "#DCFCE7", color: "#166534", label: "Ready" }
     : status === "in-progress"
       ? { bg: "#DBEAFE", color: "#1D4ED8", label: "In Room" }
       : { bg: "#E2E8F0", color: "#475569", label: "Queued" };
-  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>;
+  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 6, minWidth: 58, height: 30, padding: "0 10px", fontSize: 11, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>{tone.label}</span>;
 }
 function DepartmentPill({ department }) {
   const tone = getDepartmentTone(department);
