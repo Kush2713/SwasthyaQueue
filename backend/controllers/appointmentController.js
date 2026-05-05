@@ -838,7 +838,8 @@ async function createQuickIntake(req, res) {
       isPregnant: false,
       isDisabled: false,
     });
-    const priorityLevel = Math.min(prioritySuggestion.suggestedPriorityLevel, 2);
+    // Reception quick intake is always expedited and treated as critical priority.
+    const priorityLevel = 1;
 
     const queue = await createQueueEntry(client, {
       appointmentId: appointment.appointment_id,
@@ -846,6 +847,19 @@ async function createQuickIntake(req, res) {
       departmentId: department_id,
       priorityLevel,
     });
+
+    await client.query(
+      `
+        UPDATE queue
+        SET urgent_review_requested = TRUE,
+            urgent_review_reason = 'Reception quick intake (expedited case)',
+            urgent_review_requested_by_role = 'receptionist',
+            urgent_review_requested_by_name = $2,
+            urgent_review_requested_at = CURRENT_TIMESTAMP
+        WHERE queue_id = $1
+      `,
+      [queue.queue_id, String(created_by_name || "Front Desk").trim() || "Front Desk"]
+    );
 
     await client.query(
       `
@@ -873,6 +887,7 @@ async function createQuickIntake(req, res) {
         symptoms: appointment.symptoms,
         priorityLevel,
         prioritySuggestion,
+        quickIntakeExpedited: true,
         mobileCaptured: Boolean(patient.phone),
         existingPatientUsed: Number.isFinite(providedPatientId) && providedPatientId > 0,
       },

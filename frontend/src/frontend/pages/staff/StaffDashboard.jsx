@@ -53,6 +53,11 @@ function isEmergencyDepartment(name = "") {
   return String(name).toLowerCase().includes("emerg");
 }
 
+function isQuickIntakeUrgentReason(reason = "") {
+  const text = String(reason || "").toLowerCase();
+  return text.includes("quick intake") || text.includes("expedited case");
+}
+
 function getDepartmentTone(departmentName = "") {
   return DEPARTMENT_COLORS[departmentName] || { bg: "#E2E8F0", text: "#334155", border: "#CBD5E1" };
 }
@@ -1171,6 +1176,14 @@ export default function StaffDashboard({ user, onLogout }) {
                             </div>
                           </div>
 
+                          {patient.urgentReviewReason ? (
+                            <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#92400E", fontWeight: 700 }}>
+                              {isQuickIntakeUrgentReason(patient.urgentReviewReason)
+                                ? "Reception quick intake: prioritize this case in consultation."
+                                : `Reception note: ${patient.urgentReviewReason}`}
+                            </div>
+                          ) : null}
+
                           <section style={{ border: "1px solid #DBEAFE", background: "#EFF6FF", borderRadius: 10, padding: 10, display: "grid", gap: 8 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               <strong style={{ color: COLORS.navy }}>Clinical Snapshot</strong>
@@ -1280,7 +1293,9 @@ export default function StaffDashboard({ user, onLogout }) {
                             <button type="button" onClick={() => navigate(`/case/queue/${patient.queueId}`)} style={btnGhost}>Open Case</button>
                             <button type="button" onClick={() => approvePriority(patient.queueId, 2)} style={{ ...btnPrimary, background: "#D97706" }}>Approve High</button>
                             <button type="button" onClick={() => approvePriority(patient.queueId, 1)} style={{ ...btnPrimary, background: "#DC2626" }}>Approve Critical</button>
-                            <button type="button" onClick={() => approvePriority(patient.queueId, patient.priorityLevel || 3)} style={btnGhost}>Clear Flag / Keep Order</button>
+                            {!isQuickIntakeUrgentReason(patient.urgentReviewReason) ? (
+                              <button type="button" onClick={() => approvePriority(patient.queueId, patient.priorityLevel || 3)} style={btnGhost}>Clear Flag / Keep Order</button>
+                            ) : null}
                         </div>
                       </div>
                     ))}
@@ -1367,7 +1382,7 @@ function TabsBar({ activeTab, onChange, userRole }) {
 function KpiCard({ value, label, color }) { return <div style={{ background: "#fff", border: "1px solid #CBD5E1", borderRadius: 10, padding: 10 }}><div style={{ fontFamily: "monospace", fontSize: 26, fontWeight: 900, color }}>{value}</div><div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{label}</div></div>; }
 function Card({ title, count, countColor, children }) { return <section style={{ border: "1px solid #CBD5E1", borderRadius: 10, overflow: "hidden", background: "#fff" }}><div style={{ background: COLORS.navy, color: "#fff", padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><strong>{title}</strong>{typeof count === "number" ? <span style={{ background: "#fff", color: countColor || COLORS.navy, borderRadius: 999, padding: "2px 8px", fontSize: 12, fontWeight: 900 }}>{count}</span> : null}</div><div style={{ padding: 10 }}>{children}</div></section>; }
 function MiniStat({ title, value }) { return <div style={{ border: "1px solid rgba(255,255,255,.25)", borderRadius: 8, padding: "8px 9px" }}><div style={{ fontSize: 11, color: COLORS.saffron }}>{title}</div><div style={{ fontSize: 14, fontWeight: 900, color: COLORS.skyText, marginTop: 2 }}>{value}</div></div>; }
-function PriorityPill({ priority }) { const tone = priority === "critical" ? { bg: "#FEE2E2", color: "#B91C1C", label: "Critical" } : priority === "high" ? { bg: "#FEF3C7", color: "#B45309", label: "High" } : { bg: "#DCFCE7", color: "#166534", label: "Normal" }; return <span style={{ background: tone.bg, color: tone.color, borderRadius: 999, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{tone.label}</span>; }
+function PriorityPill({ priority }) { const tone = priority === "critical" ? { bg: "#FEE2E2", color: "#B91C1C", label: "Critical" } : priority === "high" ? { bg: "#FEF3C7", color: "#B45309", label: "High" } : { bg: "#DCFCE7", color: "#166534", label: "Normal" }; return <span style={{ background: tone.bg, color: tone.color, borderRadius: 6, padding: "2px 7px", fontSize: 11, fontWeight: 800, lineHeight: 1.2 }}>{tone.label}</span>; }
 function FlagPill({ tone, label }) {
   const palette = tone === "critical"
     ? { bg: "#FEE2E2", color: "#B91C1C" }

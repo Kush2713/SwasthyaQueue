@@ -422,7 +422,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
       setQuickIntakeState({
         loading: false,
         error: "",
-        success: `Patient added with token #${response.case.currentVisit.token} in ${response.case.currentVisit.department}. Use Open Case only if profile or clinical details need follow-up.`,
+        success: `Patient added with token #${response.case.currentVisit.token} in ${response.case.currentVisit.department}. Marked as Critical + Urgent Review for nurse priority handling.`,
       });
       setQuickIntakeForm({
         name: "",
@@ -665,7 +665,7 @@ export default function ReceptionDashboard({ user, onLogout }) {
                 </div>
               </div>
               <div style={{ marginTop: 10 }}>
-                <Notice tone="neutral" text="Quick Intake is treated as an expedited manual intake. Nurse triage can refine urgency after assessment." />
+                <Notice tone="warn" text="Quick Intake always enters queue as Critical + Urgent Review. These cases are prioritized before normal queue." />
               </div>
               <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <button type="submit" disabled={quickIntakeState.loading} style={{ ...btnPrimary, opacity: quickIntakeState.loading ? 0.7 : 1, cursor: quickIntakeState.loading ? "not-allowed" : "pointer" }}>
