@@ -935,7 +935,7 @@ function PriorityPill({ priority }) {
     : priority === "high"
       ? { bg: "#FEF3C7", color: "#B45309", label: "High" }
       : { bg: "#DCFCE7", color: "#166534", label: "Normal" };
-  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>{tone.label}</span>;
+  return <span style={{ background: tone.bg, color: tone.color, borderRadius: 6, minWidth: 58, height: 30, padding: "0 10px", fontSize: 11, fontWeight: 800, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>{tone.label}</span>;
 }
 
 function MiniStat({ title, value }) {

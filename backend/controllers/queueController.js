@@ -110,6 +110,11 @@ function validateTriageVitals({ temperatureF, pulseRate, spo2, weightKg, bloodPr
   return "";
 }
 
+function isQuickIntakeUrgentReason(reason = "") {
+  const text = String(reason || "").toLowerCase();
+  return text.includes("quick intake") || text.includes("expedited case");
+}
+
 // Add patient to queue with ML + fallback logic
 const addToQueue = async (req, res) => {
   try {
@@ -637,7 +642,7 @@ const approvePriorityOverride = async (req, res) => {
 
     const currentQueueResult = await pool.query(
       `
-        SELECT queue_id, urgent_review_requested
+        SELECT queue_id, urgent_review_requested, urgent_review_reason, appointment_id, status
         FROM queue
         WHERE queue_id = $1
           AND status IN ('waiting', 'in-progress')
@@ -672,23 +677,68 @@ const approvePriorityOverride = async (req, res) => {
       return res.status(404).json({ error: "Queue entry not found for escalation." });
     }
 
+    const currentQueue = currentQueueResult.rows[0];
+    const shouldAutoRouteToDoctor =
+      isNurseOverride
+      && priorityLevel === 1
+      && isQuickIntakeUrgentReason(currentQueue.urgent_review_reason);
+
+    if (shouldAutoRouteToDoctor) {
+      await pool.query(
+        `
+          UPDATE queue
+          SET status = 'in-progress'
+          WHERE queue_id = $1
+            AND status = 'waiting'
+        `,
+        [queueId]
+      );
+
+      if (currentQueue.appointment_id) {
+        await pool.query(
+          `
+            UPDATE appointments
+            SET status = 'in-progress',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE appointment_id = $1
+              AND status IN ('queued', 'booked', 'in-progress')
+          `,
+          [currentQueue.appointment_id]
+        );
+      }
+    }
+
+    const refreshedResult = await pool.query(
+      `
+        SELECT *
+        FROM queue
+        WHERE queue_id = $1
+        LIMIT 1
+      `,
+      [queueId]
+    );
+    const refreshedQueue = refreshedResult.rows[0] || result.rows[0];
+
     await logWorkflowEvent(pool, {
       actor,
       action: "queue_priority_overridden",
       entityType: "queue",
       entityId: queueId,
-      patientId: result.rows[0].patient_id,
-      appointmentId: result.rows[0].appointment_id || null,
+      patientId: refreshedQueue.patient_id,
+      appointmentId: refreshedQueue.appointment_id || null,
       queueId,
       details: {
         priorityLevel,
         note: escalationNote || null,
+        autoRoutedToDoctor: shouldAutoRouteToDoctor,
       },
     });
 
     res.json({
-      message: "Priority updated successfully.",
-      queue: result.rows[0],
+      message: shouldAutoRouteToDoctor
+        ? "Priority updated. Quick-intake critical case routed to doctor flow."
+        : "Priority updated successfully.",
+      queue: refreshedQueue,
     });
   } catch (err) {
     console.error(err);
