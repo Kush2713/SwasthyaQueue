@@ -10,7 +10,8 @@
     "test:e2e:smoke": "node scripts/e2e-smoke.js",
     "test:e2e:full": "node scripts/e2e-full.js",
     "empty-run": "node scripts/seed-empty.js",
-    "complete-run": "node scripts/seed-demo-cases.js --reset --rush"
+    "complete-run": "node scripts/seed-demo-cases.js --reset --rush",
+    "showcase-run": "node scripts/seed-showcase-cases.js --reset"
   },
   "dependencies": {
     "axios": "^1.13.6",

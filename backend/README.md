@@ -141,6 +141,7 @@ Data state commands:
 ```powershell
 npm.cmd run empty-run
 npm.cmd run complete-run
+npm.cmd run showcase-run
 npm.cmd run test:e2e:smoke
 npm.cmd run test:e2e:full
 ```
@@ -309,6 +310,8 @@ Doctors:
 - preferred slot is optional (no slot selected by default)
 - if preferred date+time is provided, advance booking is allowed only when pain scale is 5 or below
 - nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`
+- patient history cards include nurse assessed-by name and doctor consulted-by name after visit updates
+- future preferred-slot queue entries are hidden from nurse/doctor queue views and remain reception-date-view only until active day
 
 ## Future Backend Improvements
 

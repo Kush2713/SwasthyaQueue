@@ -316,10 +316,12 @@ export default function PatientDashboard({ user, tokenData: latestToken, onLogou
                     </div>
                   ) : null}
                   {appointment.triage?.notes ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Nurse note: {appointment.triage.notes}</div> : null}
+                  {appointment.triage?.assessedByName ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Assessed by nurse: {appointment.triage.assessedByName}</div> : null}
                   {appointment.doctor?.diagnosis ? <div style={{ marginTop: 6, fontSize: 13, color: "#334155" }}>Diagnosis: {appointment.doctor.diagnosis}</div> : null}
                   {appointment.doctor?.prescription ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Prescription / Advice: {appointment.doctor.prescription}</div> : null}
                   {appointment.doctor?.testsOrdered ? <div style={{ marginTop: 4, fontSize: 13, color: "#334155" }}>Tests: {appointment.doctor.testsOrdered}</div> : null}
                   {appointment.doctor?.notes ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Doctor notes: {appointment.doctor.notes}</div> : null}
+                  {appointment.doctor?.consultedByName ? <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>Consulted by doctor: {appointment.doctor.consultedByName}</div> : null}
                   {appointment.doctor?.followUpDate ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>Follow-up: {formatDateTime(appointment.doctor.followUpDate)}</div> : null}
                   {appointment.doctor?.followUpNotes ? <div style={{ marginTop: 4, fontSize: 12, color: "#64748B" }}>Follow-up advice: {appointment.doctor.followUpNotes}</div> : null}
                 </div>

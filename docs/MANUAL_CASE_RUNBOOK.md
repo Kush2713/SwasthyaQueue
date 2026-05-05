@@ -13,6 +13,23 @@ Run from [backend](/D:/Study/Learning/Projects/SwasthyaQueue/backend):
 npm.cmd run empty-run
 ```
 
+Optional ready-made showcase dataset (recommended for quick demos):
+
+```powershell
+npm.cmd run showcase-run
+```
+
+This seeds 20 patients total:
+- 5 departments
+- for each department: 1 normal queue + 1 quick-intake + 1 staff-assisted + 1 completed
+- plus 5 future-date advance-booking queue entries (one per department)
+
+Future-date validation:
+1. Open Reception dashboard and set `Queue Date` to tomorrow.
+2. Verify future advance-booking rows appear there.
+3. Open Nurse/Doctor dashboards with current date.
+4. Verify those future entries do not show in active clinical queues.
+
 ## 1. Shared Execution Pattern (Use For Every Case)
 
 1. Patient signup or reception intake using case details.

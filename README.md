@@ -49,6 +49,11 @@ or
 cd backend
 npm.cmd run complete-run
 ```
+or
+```powershell
+cd backend
+npm.cmd run showcase-run
+```
 
 5. Optional automated flow test
 ```powershell
@@ -103,6 +108,12 @@ Admin:
 From `backend/`:
 - `npm.cmd run empty-run` -> clear operational data
 - `npm.cmd run complete-run` -> load full demo+rush dataset
+- `npm.cmd run showcase-run` -> load one structured scenario set per department:
+  - normal queue
+  - quick intake
+  - staff-assisted
+  - completed visit
+  - future-date advance booking (reception date-wise review)
 - `npm.cmd run test:e2e:smoke` -> run end-to-end API smoke flow
 - `npm.cmd run test:e2e:full` -> reset DB and run full end-to-end checks for all 5 departments
 
@@ -442,6 +453,7 @@ Operational validation notes:
 - Preferred slot is optional (default no slot selected). If date+time are provided, advance booking is allowed only when pain level is 5 or below.
 - Nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`.
 - Staff read/write visibility is scoped by assigned departments.
+- Future preferred-slot queue items are visible in Reception by selecting future `Queue Date`, and hidden from nurse/doctor queue views until active day.
 
 ## Workflow Summary
 

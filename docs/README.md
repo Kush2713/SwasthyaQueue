@@ -15,6 +15,8 @@ Run-state helpers (from `backend/`) for demos:
 
 - `npm.cmd run empty-run` -> clear all operational records
 - `npm.cmd run complete-run` -> load full baseline + rush demo dataset
+- `npm.cmd run showcase-run` -> load clean showcase dataset (4 scenarios x 5 departments)
+  - plus future-date advance-booking rows for reception date-wise validation
 - `npm.cmd run test:e2e:smoke` -> automated API workflow verification
 
 Current hardening highlights (already implemented):

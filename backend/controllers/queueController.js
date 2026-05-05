@@ -209,6 +209,9 @@ const getQueueByDepartment = async (req, res) => {
     const avgTime = dept.rows[0].avg_consult_time;
     const departmentName = dept.rows[0].name;
 
+    const role = String(req.auth?.role || "").toLowerCase();
+    const shouldHideFutureForClinical = role === "nurse" || role === "doctor";
+
     const result = await pool.query(
       `
         SELECT
@@ -243,9 +246,10 @@ const getQueueByDepartment = async (req, res) => {
         WHERE q.department_id = $1
           AND q.status IN ('waiting', 'in-progress')
           AND (COALESCE(a.preferred_slot, q.created_at) AT TIME ZONE '${HOSPITAL_TIMEZONE}')::date = $2::date
+          AND ($3::boolean = FALSE OR COALESCE(a.preferred_slot, q.created_at) <= CURRENT_TIMESTAMP)
         ORDER BY priority_level ASC, token_number ASC
       `,
-      [departmentId, queueDate]
+      [departmentId, queueDate, shouldHideFutureForClinical]
     );
 
     const enhancedQueue = await Promise.all(result.rows.map(async (patient, index) => {
