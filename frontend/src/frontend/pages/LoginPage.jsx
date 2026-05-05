@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   loginStaff,
+  loginPatientWithGoogle,
   requestPatientOtp,
   signupPatientAccount,
   verifyPatientOtp,
@@ -60,6 +61,62 @@ export default function LoginPage({ onLogin }) {
   const [staffPassword, setStaffPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  const handleGoogleContinue = () => {
+    const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+    if (!supabaseUrl) {
+      setError("Google login is not configured yet. Please contact admin.");
+      return;
+    }
+
+    const cleanedSupabaseUrl = supabaseUrl.replace(/\/+$/, "");
+    const redirectTo = `${window.location.origin}/`;
+    const oauthUrl = `${cleanedSupabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+    window.location.assign(oauthUrl);
+  };
+
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    if (!hash.includes("access_token=")) return;
+
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const accessToken = params.get("access_token");
+    if (!accessToken) return;
+
+    const finishGoogleLogin = async () => {
+      setLoading(true);
+      setError("");
+      setNotice("Completing Google sign-in...");
+      setActiveRole("patient");
+
+      try {
+        const response = await loginPatientWithGoogle({ accessToken });
+        if (response?.requiresSignup) {
+          setPatientMode("signup");
+          setPatientStep("request");
+          setIdentifier(response.profile?.email || "");
+          setSignupForm((prev) => ({
+            ...prev,
+            email: response.profile?.email || "",
+            name: response.profile?.name || prev.name,
+          }));
+          setNotice("Google verified. Please complete your details to finish signup.");
+          return;
+        }
+
+        if (response?.user && typeof onLogin === "function") {
+          onLogin(response.user);
+        }
+      } catch (err) {
+        setError(err.message || "Google login failed. Please try again.");
+      } finally {
+        setLoading(false);
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    };
+
+    finishGoogleLogin();
+  }, [onLogin]);
 
   const patientTitle = useMemo(
     () =>
@@ -230,6 +287,14 @@ export default function LoginPage({ onLogin }) {
             <div className="px-6 py-5">
               {activeRole === "patient" ? (
                 <>
+                  <button
+                    type="button"
+                    onClick={handleGoogleContinue}
+                    className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Continue with Google
+                  </button>
+
                   <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-[#F8FAFC] p-1.5">
                     <ModeButton
                       active={patientMode === "login"}

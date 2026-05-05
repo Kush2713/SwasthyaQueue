@@ -295,7 +295,28 @@ Create `frontend/.env.local` using `frontend/.env.example`.
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
+NEXT_PUBLIC_SUPABASE_URL=https://<your-supabase-project-ref>.supabase.co
 ```
+
+### Google Sign-In (Supabase) Setup
+
+For patient "Continue with Google" flow:
+
+1. In Supabase -> `Authentication` -> `Sign In / Providers` -> enable Google.
+2. In Google Cloud OAuth client:
+   - Authorized redirect URI must include:
+     - `https://<your-supabase-project-ref>.supabase.co/auth/v1/callback`
+3. In Supabase -> `Authentication` -> `URL Configuration`:
+   - `Site URL` = your frontend URL
+   - add same frontend URL in `Redirect URLs`
+4. Backend env must include:
+   - `SUPABASE_URL=https://<your-supabase-project-ref>.supabase.co`
+   - `SUPABASE_ANON_KEY=<supabase-anon-key>`
+
+Security caution:
+- Never commit real API keys/secrets to Git.
+- Keep keys only in environment variables (local `.env`, Render env, etc.).
+- Rotate any key immediately if it was ever exposed.
 
 ## Database
 

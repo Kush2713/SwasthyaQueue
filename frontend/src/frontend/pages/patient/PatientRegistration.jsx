@@ -521,7 +521,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", fontSize: 12, marginBottom: 12 }}><span style={{ color: "#64748B" }}>No pain (0)</span><span style={{ fontWeight: 700, color: form.painScale >= 7 ? "#DC2626" : form.painScale >= 5 ? "#D97706" : COLORS.navy }}>{risk.painSeverity}</span><span style={{ color: "#64748B", textAlign: "right" }}>Severe (10)</span></div>
                   {advanceSlotBlocked ? (
                     <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
-                      Pain level above 5 cannot be advance booked. No slot selected.
+                      Pain level above 5 cannot be advance booked. No slot selected. You can continue booking and visit the hospital now since this may need urgent attention.
                     </div>
                   ) : null}
                   <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...availableDepartments]} /></Field>

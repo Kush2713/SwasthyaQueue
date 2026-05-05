@@ -486,6 +486,103 @@ async function loginStaff(req, res) {
   });
 }
 
+async function loginPatientWithGoogle(req, res) {
+  const accessToken = String(req.body.accessToken || "").trim();
+  if (!accessToken) {
+    return res.status(400).json({ error: "Google access token is required." });
+  }
+
+  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+  if (!supabaseUrl) {
+    return res.status(500).json({ error: "Google login is not configured on server." });
+  }
+
+  try {
+    const userResponse = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
+      },
+    });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({ error: "Google session validation failed. Please try again." });
+    }
+
+    const googleUser = await userResponse.json();
+    const normalizedEmail = normalizeEmail(googleUser.email);
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: "Google account email is required." });
+    }
+
+    if (!googleUser.email_confirmed_at) {
+      return res.status(400).json({ error: "Google email is not verified." });
+    }
+
+    const existing = await pool.query(
+      `
+        SELECT
+          pa.account_id,
+          pa.patient_id,
+          pa.mobile,
+          pa.email,
+          p.name,
+          p.age,
+          p.gender,
+          p.phone,
+          p.address,
+          p.emergency_contact,
+          p.blood_group,
+          p.allergies,
+          p.chronic_conditions
+        FROM patient_accounts pa
+        JOIN patients p ON p.patient_id = pa.patient_id
+        WHERE LOWER(pa.email) = LOWER($1)
+      `,
+      [normalizedEmail]
+    );
+
+    if (!existing.rows.length) {
+      return res.json({
+        requiresSignup: true,
+        profile: {
+          email: normalizedEmail,
+          name:
+            googleUser.user_metadata?.full_name ||
+            googleUser.user_metadata?.name ||
+            "",
+        },
+      });
+    }
+
+    const account = existing.rows[0];
+    const token = issueAuthToken({
+      accountId: account.account_id,
+      patientId: account.patient_id,
+      role: "patient",
+    });
+
+    await logWorkflowEvent(pool, {
+      actor: { role: "patient", accountId: account.account_id, name: account.name },
+      action: "patient_login_google",
+      entityType: "patient_account",
+      entityId: account.account_id,
+      patientId: account.patient_id,
+      details: { channel: "google" },
+    });
+
+    return res.json({
+      message: "Google login successful.",
+      user: sanitizePatientUser(account, token),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Unable to login with Google right now." });
+  }
+}
+
 async function getCurrentSession(req, res) {
   if (req.auth.role !== "patient") {
     const token = req.headers.authorization?.slice(7);
@@ -553,6 +650,7 @@ module.exports = {
   createAssistedPatientAccount,
   requestPatientOtp,
   verifyPatientOtp,
+  loginPatientWithGoogle,
   loginStaff,
   getCurrentSession,
 };

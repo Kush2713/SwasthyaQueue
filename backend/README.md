@@ -176,7 +176,14 @@ QUEUE_HOUSEKEEPING_ENABLED=true
 QUEUE_HOUSEKEEPING_INTERVAL_MINUTES=15
 OPD_START_TIME=09:30
 OPD_END_TIME=21:30
+SUPABASE_URL=https://<your-supabase-project-ref>.supabase.co
+SUPABASE_ANON_KEY=<supabase-anon-key>
 ```
+
+Security caution:
+- Do not commit real secrets to Git.
+- Keep `SUPABASE_ANON_KEY`, DB credentials, and auth secrets only in environment variables.
+- If any secret is accidentally exposed, rotate it immediately.
 
 Hosted setups can use:
 
@@ -219,6 +226,7 @@ Doctors:
 - `POST /api/auth/patient/signup`
 - `POST /api/auth/patient/request-otp`
 - `POST /api/auth/patient/verify-otp`
+- `POST /api/auth/patient/google-login`
 - `GET /api/auth/me`
 - `POST /api/auth/staff/patient-account`
 

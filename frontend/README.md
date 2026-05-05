@@ -173,6 +173,7 @@ Create `.env.local` from `.env.example`:
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:5000
 NEXT_PUBLIC_OTP_PREVIEW=true
+NEXT_PUBLIC_SUPABASE_URL=https://<your-supabase-project-ref>.supabase.co
 NEXT_PUBLIC_STAFF_POLL_MS=10000
 NEXT_PUBLIC_RECEPTION_POLL_MS=20000
 NEXT_PUBLIC_PATIENT_POLL_MS=30000
@@ -182,6 +183,10 @@ NEXT_PUBLIC_OPD_START_TIME=09:30
 NEXT_PUBLIC_OPD_END_TIME=21:30
 NEXT_PUBLIC_OPD_SLOT_INTERVAL_MINUTES=30
 ```
+
+Google sign-in note:
+- Frontend uses `NEXT_PUBLIC_SUPABASE_URL` to start OAuth.
+- Never store secrets in frontend env; only public URL values belong here.
 
 ## Important Frontend Files
 

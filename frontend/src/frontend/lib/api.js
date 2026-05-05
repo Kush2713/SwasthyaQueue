@@ -118,6 +118,13 @@ export function verifyPatientOtp(payload) {
   });
 }
 
+export function loginPatientWithGoogle(payload) {
+  return request("/api/auth/patient/google-login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function loginStaff(payload) {
   return request("/api/auth/staff/login", {
     method: "POST",
