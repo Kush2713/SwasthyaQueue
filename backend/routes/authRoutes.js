@@ -7,6 +7,7 @@ const {
   requestPatientOtp,
   verifyPatientOtp,
   loginPatientWithGoogle,
+  signupPatientWithGoogle,
   loginStaff,
   getCurrentSession,
 } = require("../controllers/authController");
@@ -18,5 +19,6 @@ router.post("/staff/patient-account", requireRoles(["receptionist"]), createAssi
 router.post("/patient/request-otp", requestPatientOtp);
 router.post("/patient/verify-otp", verifyPatientOtp);
 router.post("/patient/google-login", loginPatientWithGoogle);
+router.post("/patient/google-signup", signupPatientWithGoogle);
 router.get("/me", requireAuth, getCurrentSession);
 module.exports = router;

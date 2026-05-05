@@ -583,6 +583,140 @@ async function loginPatientWithGoogle(req, res) {
   }
 }
 
+async function signupPatientWithGoogle(req, res) {
+  const validationError = validateSignup(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
+  const accessToken = String(req.body.accessToken || "").trim();
+  if (!accessToken) {
+    return res.status(400).json({ error: "Google access token is required." });
+  }
+
+  const supabaseUrl = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+  if (!supabaseUrl) {
+    return res.status(500).json({ error: "Google login is not configured on server." });
+  }
+
+  const mobile = normalizeMobile(req.body.mobile);
+  const resolvedEmergency = req.body.emergencyContact?.trim() || null;
+  const email = req.body.email ? normalizeEmail(req.body.email) : null;
+
+  if (!email) {
+    return res.status(400).json({ error: "Google email is required to continue." });
+  }
+
+  const client = await pool.connect();
+  try {
+    const userResponse = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}),
+      },
+    });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({ error: "Google session validation failed. Please try again." });
+    }
+
+    const googleUser = await userResponse.json();
+    const normalizedGoogleEmail = normalizeEmail(googleUser.email);
+    if (!normalizedGoogleEmail || normalizedGoogleEmail !== email) {
+      return res.status(400).json({ error: "Google account email mismatch. Please retry Google sign-in." });
+    }
+
+    if (!googleUser.email_confirmed_at) {
+      return res.status(400).json({ error: "Google email is not verified." });
+    }
+
+    await client.query("BEGIN");
+
+    const existingAccount = await client.query(
+      `
+        SELECT account_id
+        FROM patient_accounts
+        WHERE mobile = $1 OR LOWER(email) = LOWER($2)
+      `,
+      [mobile, email]
+    );
+
+    if (existingAccount.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "An account already exists with this mobile or email." });
+    }
+
+    const patientResult = await client.query(
+      `
+        INSERT INTO patients (
+          name, age, gender, phone, email, address, emergency_contact, blood_group, allergies, chronic_conditions
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `,
+      [
+        req.body.name.trim(),
+        Number(req.body.age),
+        req.body.gender,
+        mobile,
+        email,
+        req.body.address?.trim() || null,
+        resolvedEmergency,
+        req.body.bloodGroup?.trim() || null,
+        req.body.allergies?.trim() || null,
+        req.body.chronicConditions?.trim() || null,
+      ]
+    );
+
+    const accountResult = await client.query(
+      `
+        INSERT INTO patient_accounts (patient_id, email, mobile, account_source)
+        VALUES ($1, $2, $3, 'self')
+        RETURNING *
+      `,
+      [patientResult.rows[0].patient_id, email, mobile]
+    );
+
+    const token = issueAuthToken({
+      accountId: accountResult.rows[0].account_id,
+      patientId: patientResult.rows[0].patient_id,
+      role: "patient",
+    });
+
+    await logWorkflowEvent(client, {
+      actor: { role: "patient", accountId: accountResult.rows[0].account_id, name: patientResult.rows[0].name },
+      action: "patient_account_created_google",
+      entityType: "patient_account",
+      entityId: accountResult.rows[0].account_id,
+      patientId: patientResult.rows[0].patient_id,
+      details: { accountSource: "self", channel: "google" },
+    });
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      message: "Account created successfully.",
+      user: sanitizePatientUser(
+        {
+          ...patientResult.rows[0],
+          ...accountResult.rows[0],
+          account_id: accountResult.rows[0].account_id,
+          patient_id: patientResult.rows[0].patient_id,
+        },
+        token
+      ),
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    return res.status(500).json({ error: "Unable to create account with Google right now." });
+  } finally {
+    client.release();
+  }
+}
+
 async function getCurrentSession(req, res) {
   if (req.auth.role !== "patient") {
     const token = req.headers.authorization?.slice(7);
@@ -651,6 +785,7 @@ module.exports = {
   requestPatientOtp,
   verifyPatientOtp,
   loginPatientWithGoogle,
+  signupPatientWithGoogle,
   loginStaff,
   getCurrentSession,
 };

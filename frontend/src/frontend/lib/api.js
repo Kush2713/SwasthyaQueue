@@ -125,6 +125,13 @@ export function loginPatientWithGoogle(payload) {
   });
 }
 
+export function signupPatientWithGoogle(payload) {
+  return request("/api/auth/patient/google-signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function loginStaff(payload) {
   return request("/api/auth/staff/login", {
     method: "POST",

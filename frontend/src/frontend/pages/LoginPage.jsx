@@ -5,6 +5,7 @@ import {
   loginPatientWithGoogle,
   requestPatientOtp,
   signupPatientAccount,
+  signupPatientWithGoogle,
   verifyPatientOtp,
 } from "../lib/api";
 
@@ -61,6 +62,7 @@ export default function LoginPage({ onLogin }) {
   const [staffPassword, setStaffPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [googleAccessToken, setGoogleAccessToken] = useState("");
 
   const handleGoogleContinue = () => {
     const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
@@ -92,6 +94,7 @@ export default function LoginPage({ onLogin }) {
       try {
         const response = await loginPatientWithGoogle({ accessToken });
         if (response?.requiresSignup) {
+          setGoogleAccessToken(accessToken);
           setPatientMode("signup");
           setPatientStep("request");
           setIdentifier(response.profile?.email || "");
@@ -143,6 +146,7 @@ export default function LoginPage({ onLogin }) {
     setNotice("");
     setError("");
     setFieldErrors({});
+    setGoogleAccessToken("");
   };
 
   const handlePatientLoginRequest = async (event) => {
@@ -190,11 +194,19 @@ export default function LoginPage({ onLogin }) {
     }
 
     try {
-      const response = await signupPatientAccount({
+      const payload = {
         ...signupForm,
         age: Number(signupForm.age),
         mobile: normalizeMobile(signupForm.mobile),
-      });
+      };
+      const response = googleAccessToken
+        ? await signupPatientWithGoogle({ ...payload, accessToken: googleAccessToken })
+        : await signupPatientAccount(payload);
+
+      if (googleAccessToken && response?.user && typeof onLogin === "function") {
+        onLogin(response.user);
+        return;
+      }
 
       const resolvedIdentifier = signupForm.email.trim() || normalizeMobile(signupForm.mobile);
       setIdentifier(resolvedIdentifier);
@@ -447,7 +459,11 @@ export default function LoginPage({ onLogin }) {
                           loading ? "cursor-not-allowed bg-slate-400" : "bg-[#003580] hover:bg-[#0050A8]"
                         }`}
                       >
-                        {loading ? "Creating Account..." : "Create Account and Send OTP"}
+                        {loading
+                          ? "Creating Account..."
+                          : googleAccessToken
+                            ? "Create Account and Continue"
+                            : "Create Account and Send OTP"}
                       </button>
                     </form>
                   )}
