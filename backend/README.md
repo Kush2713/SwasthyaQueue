@@ -298,7 +298,8 @@ Doctors:
 - `OTP_PREVIEW_ENABLED` is only for demo/local testing and should be disabled in production-like use
 - staff passwords support hashed storage (`pbkdf2`) with legacy plain-text auto-upgrade on successful login
 - OTP expiry validation is DB-time based (`CURRENT_TIMESTAMP`) to avoid timezone drift bugs
-- same-day booking is allowed only for future slots (next hour onward) and within OPD window
+- preferred slot is optional (no slot selected by default)
+- if preferred date+time is provided, advance booking is allowed only when pain scale is 5 or below
 - nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`
 
 ## Future Backend Improvements

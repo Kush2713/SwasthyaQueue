@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getOpdHoursLabel, getOpdSlotOptions } from "../../lib/timing";
+import { getOpdSlotOptions } from "../../lib/timing";
 
 const COLORS = {
   navyDark: "#002060",
@@ -36,7 +36,6 @@ const symptomDefs = [
 const symptomMap = Object.fromEntries(symptomDefs.map((item) => [item.key, item]));
 const fallbackDepartments = ["General Medicine", "Cardiology", "Orthopedics", "Pediatrics", "Emergency"];
 const slotTimeOptions = getOpdSlotOptions();
-const OPD_HOURS_LABEL = getOpdHoursLabel();
 
 const labelStyle = { fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6, display: "block" };
 const inputStyle = {
@@ -78,7 +77,7 @@ function formatSlotTime(timeValue = "") {
 }
 
 function formatPreferredSlot(value) {
-  if (!value) return "No preference";
+  if (!value) return "No slot selected";
   return new Date(value).toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -102,38 +101,7 @@ function getTodayDateValue() {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentMinutes() {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
-
-function getClosestSlotForNow(slots = []) {
-  if (!slots.length) return "";
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const slotMinutes = slots
-    .map((value) => {
-      const [h, m] = String(value).split(":").map((part) => Number(part));
-      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-      return { value, minutes: h * 60 + m };
-    })
-    .filter(Boolean);
-  if (!slotMinutes.length) return "";
-  let best = slotMinutes[0];
-  let bestDistance = Math.abs(best.minutes - currentMinutes);
-  for (const item of slotMinutes) {
-    const distance = Math.abs(item.minutes - currentMinutes);
-    if (distance < bestDistance) {
-      best = item;
-      bestDistance = distance;
-    }
-  }
-  return best.value;
-}
-
 export default function PatientRegistration({ onBack, user, onRegistered }) {
-  const defaultPreferredDate = getTodayDateValue();
-  const defaultPreferredTime = getClosestSlotForNow(slotTimeOptions);
   const initialForm = {
     name: user?.name || "",
     mobile: user?.mobile || "",
@@ -146,8 +114,8 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     symptoms: [],
     otherSymptoms: "",
     painScale: 0,
-    preferredDate: defaultPreferredDate,
-    preferredTime: defaultPreferredTime,
+    preferredDate: "",
+    preferredTime: "",
     department: "Auto-detect from symptoms",
   };
 
@@ -166,6 +134,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     () => computeRisk(form.symptoms, form.age, form.gender, Number(form.painScale)),
     [form.symptoms, form.age, form.gender, form.painScale]
   );
+  const advanceSlotBlocked = Number(form.painScale) > 5;
 
   const ageNum = Number(form.age);
   const ageNote =
@@ -232,25 +201,20 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
     if ((form.preferredDate && !form.preferredTime) || (!form.preferredDate && form.preferredTime)) {
       return "Select both preferred date and preferred time, or leave both empty.";
     }
-    if (form.preferredDate && Number(form.painScale) > 5) {
-      return "Pain level above 5 cannot be advance booked. Please continue without preferred slot.";
-    }
     if (form.preferredDate) {
       const today = getTodayDateValue();
       if (form.preferredDate < today) {
         return "Preferred appointment date cannot be in the past.";
       }
-      if (form.preferredDate === today && form.preferredTime) {
-        const [hourText, minuteText] = String(form.preferredTime).split(":");
-        const slotMinutes = Number(hourText) * 60 + Number(minuteText);
-        const nextHourStart = Math.ceil(getCurrentMinutes() / 60) * 60;
-        if (slotMinutes < nextHourStart) {
-          return "For today, choose a slot from the next hour onward.";
-        }
-      }
     }
     return "";
   };
+
+  useEffect(() => {
+    if (!advanceSlotBlocked) return;
+    if (!form.preferredDate && !form.preferredTime) return;
+    setForm((prev) => ({ ...prev, preferredDate: "", preferredTime: "" }));
+  }, [advanceSlotBlocked, form.preferredDate, form.preferredTime]);
 
   const next = () => {
     const message = step === 1 ? checkStep1() : checkStep2();
@@ -523,7 +487,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                 <>
                   {departmentLoadError ? <NoticeBox message={departmentLoadError} /> : null}
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 12, marginBottom: 12, fontSize: 13 }}>
-                    Select the symptoms that best match the patient. Hospital appointment hours are {OPD_HOURS_LABEL}.
+                    Select the symptoms that best match the patient.
                   </div>
                   <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", marginBottom: 14 }}>
                     {symptomDefs.map((item) => {
@@ -555,6 +519,11 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                   {form.symptoms.includes("Other") ? <Field label="Other Symptoms / Details"><Input value={form.otherSymptoms} onChange={(value) => setField("otherSymptoms", value)} placeholder="Enter a short note for staff" /></Field> : null}
                   <Field label={`Pain Level: ${form.painScale}/10`}><input type="range" min={0} max={10} step={1} value={form.painScale} onChange={(event) => setField("painScale", Number(event.target.value))} style={{ width: "100%" }} /></Field>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", fontSize: 12, marginBottom: 12 }}><span style={{ color: "#64748B" }}>No pain (0)</span><span style={{ fontWeight: 700, color: form.painScale >= 7 ? "#DC2626" : form.painScale >= 5 ? "#D97706" : COLORS.navy }}>{risk.painSeverity}</span><span style={{ color: "#64748B", textAlign: "right" }}>Severe (10)</span></div>
+                  {advanceSlotBlocked ? (
+                    <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
+                      Pain level above 5 cannot be advance booked. No slot selected.
+                    </div>
+                  ) : null}
                   <Field label="Department Preference"><Select value={form.department} onChange={(value) => setField("department", value)} options={["Auto-detect from symptoms", ...availableDepartments]} /></Field>
                   <Row2Col>
                     <Field label="Preferred Date (optional)">
@@ -569,9 +538,6 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                       </select>
                     </Field>
                   </Row2Col>
-                  <div style={{ border: "1px solid #FCD34D", background: "#FFFBEB", color: "#92400E", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 }}>
-                    OPD appointment hours are {OPD_HOURS_LABEL}. Please choose a slot within hospital hours.
-                  </div>
                   <NavRow><GhostBtn onClick={() => setStep(1)}>Back</GhostBtn><PrimaryBtn onClick={next}>Review</PrimaryBtn></NavRow>
                 </>
               ) : null}
@@ -584,7 +550,7 @@ export default function PatientRegistration({ onBack, user, onRegistered }) {
                     <SummaryRow label="Mobile" value={formatIndianMobile(form.mobile)} />
                     <SummaryRow label="Department" value={reviewDepartment} />
                     <SummaryRow label="Symptoms" value={selectedSymptomsForReview.join(", ") || "Not specified"} />
-                    <SummaryRow label="Preferred Slot" value={form.preferredDate && form.preferredTime ? `${form.preferredDate} | ${formatSlotTime(form.preferredTime)}` : "No preference"} />
+                    <SummaryRow label="Preferred Slot" value={form.preferredDate && form.preferredTime ? `${form.preferredDate} | ${formatSlotTime(form.preferredTime)}` : "No slot selected"} />
                     <SummaryRow label="Pain Level" value={`${form.painScale}/10`} noBorder />
                   </div>
                   <div style={{ border: "1px solid #CBD5E1", background: "#F8FAFC", color: "#334155", borderRadius: 10, padding: 10, marginBottom: 10 }}>Your details will be reviewed by staff and the correct queue will be assigned.</div>

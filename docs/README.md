@@ -22,7 +22,7 @@ Current hardening highlights (already implemented):
 - department-scoped staff visibility and write authorization
 - department-specific nurse triage required fields
 - stable queue workflow guards (clear 409 errors for wrong-state actions)
-- same-day preferred-slot booking support (future slot + OPD window rules)
+- optional preferred-slot booking support (no slot selected by default; advance slot allowed only for pain level <= 5)
 
 Current final-branch role setup:
 

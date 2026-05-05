@@ -418,7 +418,7 @@ Main routes:
 
 Operational validation notes:
 
-- Same-day booking is allowed if slot is in the future (from next hour onward) and within OPD hours.
+- Preferred slot is optional (default no slot selected). If date+time are provided, advance booking is allowed only when pain level is 5 or below.
 - Nurse triage and ready-for-doctor actions are allowed only when queue status is `in-progress`.
 - Staff read/write visibility is scoped by assigned departments.
 

@@ -7,7 +7,8 @@ This document explains how each role is expected to use the system.
 1. Patient signs up using mobile/email and OTP.
 2. Patient lands on the dashboard.
 3. Patient books a visit by entering current symptoms.
-   - same-day slot is allowed only if it is in the future (next hour onward) and within OPD hours
+   - preferred slot is optional; leave both date and time empty for normal immediate booking
+   - if preferred date+time is selected, advance slot is allowed only when pain level is 5 or below
 4. Patient reviews and confirms.
 5. Token is generated.
 6. Patient tracks queue state on dashboard.
